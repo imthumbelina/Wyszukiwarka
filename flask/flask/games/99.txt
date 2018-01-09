@@ -1,0 +1,428 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Graphics Programming and Theory » Article: Introduction to Shader Programming Part II: Programming Vertex Shaders Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Introduction to Shader Programming Part IV: Programming Pixel Shaders Advanced Shader Programming: Diffuse & Specular Lighting with Pixel Shaders Shader Programming Part I: Fundamentals of Vertex Shaders Direct3D 7 IM Framework Programming 2: First Steps to Animation Introduction to Shader Programming Part III Fundamentals of Pixel Shaders Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Introduction to Shader Programming Part II: Programming Vertex Shaders By Wolfgang F. Engel | Published Apr 24 2002 05:15 PM in Graphics Programming and Theory vertex shader file buffer return example racorx matrix Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource (Editor's Note - this article requires additional formatting work and is incomplete) (Last modification: March 31st, 2002) Preface During this part of the introduction a very simple program that shows a rotating quad will evolve into a more sophisticated application showing a Bézier patch class with a diffuse and specular reflection model, featuring a point light source. The example applications are all build on each other in a way that most of the code of the previous example is re-used in the following example. This way the explanation of the features stayed focused on the advancements of the specific example. RacorX Figure 1 - RacorX RacorX (see attached resource file) displays a green color, that is applied to the quad evenly. This example demonstrate the usage of the common file framework, provided with the DirectX 8.1 SDK and how to compile vertex shaders with the D3DXAssembleShader() function. Like with all the upcoming examples, which are based on the Common Files, <Alt>+<Enter> switches between the windowed and full-screen mode, <F2> gives you a selection of the usable drivers and <Esc> will shutdown the application. First let's take a look at the files you need to compile the program: Figure 2- Directory Content The source file is RacorX.cpp, the resource files are winmain.rc and resource.h. The icon file is directx.ico and the executable is RacorX.exe. The remaining files are for the use of the Visual C/C++ 6 IDE. To compile this example, you should link it with the following *.lib files: d3d8.lib d3dx8dt.lib dxguid.lib d3dxof.lib winmm.lib gdi32.lib user32.lib kernel32.lib advapi32.lib Most of these *.lib files are COM wrappers. The d3dx8dt.lib is the debug version of the Direct3DX static link library. The release Direct3DX static link library is called d3dx8.lib. There is also a *.dll version of the debug build called d3dx8d.dll in the system32 directory. It is used by linking to the d3dx8d.lib COM wrapper. All of these *.lib files have to be included in the <Object/libary modules:> entry field. This is located at <Project->Settings> and there under the <Link> tab: Figure 3 - Project Settings The provided Visual C/C++ 6 IDE workspace references the common files in a folder with the same name: Figure 4 - Workspace They were added to the project with Project->Add to the Project->Files: Figure 5 - Add Files to Project The Common Files Framework The common files framework helps getting up to speed, because: It helps to avoid how-tos for Direct3D in general, so that the focus of this text is the real stuff. It's common and tested foundation, which helps reduce the debug time. All of the Direct3D samples in the DirectX SDK use it. Learning time is very short. Its window mode makes debugging easier. Self-developed production code could be based on the common files, so knowing them is always a win. A high-level view of the Common Files shows 14 *.cpp files in C:\DXSDK\samples\Multimedia\Common\src These files encapsulate the basic functionality you need to start programming a Direct3D application. The most important d3dapp.cpp contains the class CD3DApplication. It provides seven functions that can be overridden and that are used in the main *.cpp file of any project in this introduction: virtual HRESULT OneTimeSceneInit() { return S_OK; } virtual HRESULT InitDeviceObjects() { return S_OK; } virtual HRESULT RestoreDeviceObjects() { return S_OK; } virtual HRESULT DeleteDeviceObjects() { return S_OK; } virtual HRESULT Render() { return S_OK; } virtual HRESULT FrameMove( FLOAT ) { return S_OK; } virtual HRESULT FinalCleanup() { return S_OK; } All that has to be done, to create an application based on this framework code is to create a new project and new implementations of these overridable functions in the main source file. This is also shown in all Direct3D examples in the DirectX SDK. RacorX uses these framework functions in RacorX.cpp. They can be called the public interface of the common files framework. Figure 6 - Framework Public Interface The following functions are called in the following order in racorx.cpp at startup: ConfirmDevice() OneTimeSceneInit() InitDeviceObjects() RestoreDeviceObjects() Now the application is running. While it is running, the framework calls FrameMove() Render() in a loop. If the user resizes the window, the framework will call InvalidateDeviceObjects() RestoreDeviceObjects() If the user presses F2 or clicks <File>-><Change device> and changes the device by choosing for example another resolution or color quality, the framework will call InvalidateDeviceObjects() DeleteDeviceObjects() InitDeviceObjects() RestoreDeviceObjects() If the user quits the application, the framework will call InvalidateDeviceObjects() DeleteDeviceObjects() FinalCleanup() There are matching functional pairs. InvalidateDeviceObjects() destroys what RestoreDeviceObjects() has build up and DeleteDeviceObjects() destroys what InitDeviceObjects() has build up. The FinalCleanup() function destroys what OneTimeSceneInit() build up. The idea is to give every functional pair its own tasks. The OneTimeSceneInit() / FinalCleanup() pair is called once at the beginning and the end of a life-cycle of the game. Both are used to load or delete data, which is not device dependant. A good candidate might be geometry data. The target of the InitDeviceObjects() / DeleteDeviceObjects() pair is, like the name implies, data that is device dependant. If the already loaded data has to be changed, when the device changes, it should be loaded here. The following examples will load, re-create or destroy their vertex buffer and index buffers and their textures in these functions. The InvalidateDeviceObjects() / RestoreDeviceObjects() pair has to react on changes of the window size. So for example code that handles the projection matrix might be placed here. Additionally the following examples will set most of the render states in RestoreDeviceObjects(). Now back to RacorX. Like shown in part 1 of this introduction, the following list tracks the life-cycle of a vertex shader: Check for vertex shader support by checking the D3DCAPS8::VertexShaderVersion field Declaration of the vertex shader with the D3DVSD_* macros, to map vertex buffer streams to input registers Setting the vertex shader constant registers with SetVertexShaderConstant() Compiling an already written vertex shader with D3DXAssembleShader*() (Alternatively: could be pre-compiled using a Shader Assembler) Creating a vertex shader handle with CreateVertexShader() Setting a vertex shader with SetVertexShader() for a specific object Free vertex shader resources handled by the Direct3D engine with DeleteVertexShader() We will walk step-by-step through this list in the following pages. Check for Vertex Shader Support The supported vertex shader version is checked in ConfirmDevice() in racorx.cpp: HRESULT CMyD3DApplication::ConfirmDevice( D3DCAPS8* pCaps,
+                                          DWORD dwBehavior,
+                                          D3DFORMAT Format )
+{
+ if( (dwBehavior & D3DCREATE_HARDWARE_VERTEXPROCESSING ) ||
+    (dwBehavior & D3DCREATE_MIXED_VERTEXPROCESSING ) )
+   {
+    if( pCaps->VertexShaderVersion < D3DVS_VERSION(1,1) )
+   	return E_FAIL;
+   }
+ return S_OK;
+} If the framework has already initialized hardware or mixed vertex processing, the vertex shader version will be checked. If the framework initialized software vertex processing, the software-implementation provided by Intel and AMD jumps in and a check of the hardware capabilities is not needed. The globally available pCaps capability data structure is filled with a call to GetDeviceCaps() by the framework. pCaps->VertexShaderVersion holds the vertex shader version in a DWORD. The macro D3DVS_VERSION helps checking the version number. For example the support of at least vs.2.0 in hardware will be checked with D3DVS_VERSION(2,0). After checking the hardware capabilities for vertex shader support, the vertex shader has to be declared. Vertex Shader Declaration Declaring a vertex shader means mapping vertex data to specific vertex shader input registers, therefore the vertex shader declaration must reflect the vertex buffer layout, because the vertex buffer must transport the vertex data in the correct order. The one used in this example program is very simple. The vertex shader will get the position data via v0. // shader decl
+DWORD dwDecl[] =
+{
+   D3DVSD_STREAM(0),
+   D3DVSD_REG(0, D3DVSDT_FLOAT3 ), // D3DVSDE_POSITION,0
+   D3DVSD_END()
+};
+
+The corresponding layout of the vertex buffer looks like this:
+
+// vertex type
+struct VERTEX
+{
+   FLOAT x, y, z; // The untransformed position for the vertex
+};
+
+// Declare custom FVF macro.
+#define D3DFVF_VERTEX (D3DFVF_XYZ) The position values will be stored in the vertex buffer and bound through the SetStreamSource() function to a device data stream port, that feed the primitive processing functions (this is the Higher-Order Surfaces (HOS) stage or directly the vertex shader, depending on the usage of HOS; see the Direct3D pipeline in part 1). We do not use vertex color here, so no color values are declared. Setting the Vertex Shader Constant Registers The vertex shader constant registers have to be filled with a call to SetVertexShaderConstant(). We set the material color in RestoreDeviceObjects() in c8 in this example: // set material color
+FLOAT fMaterial[4] = {0,1,0,0};
+m_pd3dDevice->SetVertexShaderConstant(8, fMaterial, 1); SetVertexShaderConstant() is declared like: HRESULT SetVertexShaderConstant (DWORD Register,
+                             	CONST void* pConstantData,
+                             	DWORD ConstantCount); The first parameter provides the number of the constant register that should be used. In this case 8. The second parameter stores the 128bit data in that constant register and the third parameter gives you the possibility to use the following registers as well. A 4x4 matrix can be stored with one SetVertexShaderConstant() call by providing the number four in ConstantCount. This is done for the clipping matrix in FrameMove(): // set the clip matrix
+...
+m_pd3dDevice->SetVertexShaderConstant(4, matTemp, 4); This way the c4, c5, c6 and c7 registers are used to store the matrix. The Vertex Shader The vertex shader that is used by RacorX is very simple: // reg c4-7 = WorldViewProj matrix
+// reg c8 = constant color
+// reg v0 = input register
+const char BasicVertexShader[] =
+"vs.1.1         	//Shader version 1.1 \n"\
+"dp4 oPos.x, v0, c4 //emit projected position \n"\
+"dp4 oPos.y, v0, c5 //emit projected position \n"\
+"dp4 oPos.z, v0, c6 //emit projected position \n"\
+"dp4 oPos.w, v0, c7 //emit projected position \n"\
+"mov oD0, c8        //material color = c8 \n"; It is used inline in a constant char array in RacorX.cpp. This vertex shader incorporates the vs.1.1 vertex shader implementation rules. It transforms from the concatenated and transposed world-, view- and projection-matrix to the clip matrix or clip space with the four dp4 instructions and kicks out into oD0 a green material color with mov. As shown above, the values of the c4 - c7 constant registers are set in FrameMove(). These values are calculated by the following code snippet: // rotates the object about the y-axis
+D3DXMatrixRotationY( &m_matWorld, m_fTime * 1.5f );
+
+// set the clip matrix
+D3DXMATRIX matTemp;
+D3DXMatrixTranspose( &matTemp , &(m_matWorld * m_matView * m_matProj) );
+m_pd3dDevice->SetVertexShaderConstant(4, matTemp, 4); First the quad is rotated around the y-axis by the D3DMatrixRotationY() call, then the concatenated matrix is transposed and then stored in the constant registers c4 - c7. The source of the D3DMatrixRotationY() function might look like: VOID D3DMatrixRotationY(D3DMATRIX * mat, FLOAT fRads)
+{
+  D3DXMatrixIdentity(mat);
+  mat._11 =  cosf(fRads);
+  mat._13 = -sinf(fRads);
+  mat._31 =  sinf(fRads);
+  mat._33 =  cosf(fRads);
+}
+=
+cosf(fRads) 0 -sinf(fRads) 0
+0       	0  0       	0
+sinf(fRads) 0  cosf(fRads) 0
+0       	0  0       	0 So fRads equals the amount you want to rotate about the y-axis. After changing the values of the matrix this way, we transpose the matrix by using D3DXMatrixTranspose(), so that its columns are stored as rows. Why do we have to transpose the matrix? A 4x4 matrix looks like this: a b c d e f g h i j k l m n o p The formula for transforming a vector (v0) through the matrix is: dest.x = (v0.x * a) + (v0.y * e) + (v0.z * i) + (v0.w * m) dest.y = (v0.x * b) + (v0.y * f) + (v0.z * j) + (v0.w * n) dest.z = (v0.x * c) + (v0.y * g) + (v0.z * k) + (v0.w * o) dest.w = (v0.x * d) + (v0.y * h) + (v0.z * l) + (v0.w * p) So each column of the matrix should be multiplied with each component of the vector. Our vertex shader uses four dp4 instructions: dest.w = (src1.x * src2.x) + (src1.y * src2.y) + 
+     	(src1.z * src2.z) + (src1.w * src2.w)
+dest.x = dest.y = dest.z = unused The dp4 instructions multiplies a row of a matrix with each component of the vector. Without transposing we would end up with: dest.x = (v0.x * a) + (v0.y * b) + (v0.z * c) + (v0.w * d)
+dest.y = (v0.x * e) + (v0.y * f) + (v0.z * g) + (v0.w * h)
+dest.z = (v0.x * i) + (v0.y * j) + (v0.z * k) + (v0.w * l)
+dest.w = (v0.x * m) + (v0.y * n) + (v0.z * o) + (v0.w * p) which is wrong. By transposing the matrix it looks like this in constant memory: a e i m b f j n c g k o d h l p so the 4 dp4 operations would now yield: dest.x = (v0.x * a) + (v0.y * e) + (v0.z * i) + (v0.w * m)
+dest.y = (v0.x * b) + (v0.y * f) + (v0.z * j) + (v0.w * n)
+dest.z = (v0.x * c) + (v0.y * g) + (v0.z * k) + (v0.w * o)
+dest.w = (v0.x * d) + (v0.y * h) + (v0.z * l) + (v0.w * p) or oPos.x = (v0.x * c4.x) + (v0.y * c4.y) + (v0.z * c4.z) + (v0.w * c4.w)
+oPos.y = (v0.x * c5.x) + (v0.y * c5.y) + (v0.z * c5.z) + (v0.w * c5.w)
+oPos.z = (v0.x * c6.x) + (v0.y * c6.y) + (v0.z * c6.z) + (v0.w * c6.w)
+oPos.w = (v0.x * c7.x) + (v0.y * c7.y) + (v0.z * c7.z) + (v0.w * c7.w) which is exactly how the vector transformation should work. dp4 gets the matrix values via the constant register c4 - c7 and the vertex position via the input register v0. Temporary registers are not used in this example. The dot product of the dp4 instructions is written to the oPos output register and the value of the constant register c8 is moved into the output register oD0, that is usually used to output diffuse color values. Compiling a Vertex Shader The vertex shader that is stored in a char array is compiled with a call to the following code snippet in RestoreDeviceObjects(): // Assemble the shader
+rc = D3DXAssembleShader( BasicVertexShader , sizeof(BasicVertexShader) -1,
+                     	0 , NULL , &pVS , &pErrors );
+if ( FAILED(rc) )
+{
+  OutputDebugString( "Failed to assemble the vertex shader, errors:\n" );
+  OutputDebugString( (char*)pErrors->GetBufferPointer() );
+  OutputDebugString( "\n" );
+} D3DXAssembleShader() creates a binary version of the shader in a buffer object via the ID3DXBuffer interface in pVS. HRESULT D3DXAssembleShader(
+  LPCVOID pSrcData,
+  UINT SrcDataLen,
+  DWORD Flags,
+  LPD3DXBUFFER* ppConstants,
+  LPD3DXBUFFER* ppCompiledShader,
+  LPD3DXBUFFER* ppCompilationErrors
+); The source data is provided in the first parameter and the size of the data length in bytes is provided in the second parameter. There are two possible flags for the third parameter called #define D3DXASM_DEBUG 1
+#define D3DXASM_SKIPVALIDATION 2 The first one inserts debug info as comments into the shader and the second one skips validation. This flag can be set for a working shader. Via the fourth parameter a ID3DXBuffer interface can be exported, to get a vertex shader declaration fragment of the constants. To ignore this parameter, it is set to NULL here. In case of an error, the error explanation would be stored in a buffer object via the ID3DXBuffer interface in pErrors. To see the output of OutputDebugString() the debug process in the Visual C/C++ IDE must be started with <F5>. Creating a Vertex Shader The vertex shader is validated and a handle for it is retrieved via a call to CreateVertexShader() in m_dwVertexShader: The following lines of code can be found in RestoreDeviceObjects(): // Create the vertex shader
+rc = m_pd3dDevice->CreateVertexShader( dwDecl, (DWORD*)pVS->GetBufferPointer(),
+                                          &m_dwVertexShader, 0 );
+if ( FAILED(rc) )
+{
+  OutputDebugString( "Failed to create the vertex shader, errors:\n" );
+  D3DXGetErrorStringA(rc,szBuffer,sizeof(szBuffer));
+  OutputDebugString( szBuffer );
+  OutputDebugString( "\n" );
+} CreateVertexShader() gets a pointer to the buffer with the binary version of the vertex shader via the ID3DXBuffer interface. This function gets the vertex shader declaration via dwDecl, that maps vertex data to specific vertex shader input registers. If an error occurs, its explanation is accessible via a pointer to a buffer object that is retrieved via the ID3DXBuffer interface in pVS->GetBufferPointer(). D3DXGetErrorStringA() interprets all Direct3D and Direct3DX HRESULTS and returns an error message in szBuffer. It is possible to force the usage of software vertex processing with the last parameter by using the D3DUSAGE_SOFTWAREPROCESSING flag. It must be used when the D3DRS_SOFTWAREVERTEXPROCESSING member of the D3DRENDERSTATETYPE enumerated type is TRUE. Setting a Vertex Shader The vertex shader is set via SetVertexShader() in the Render() function: // set the vertex shader
+m_pd3dDevice->SetVertexShader( m_dwVertexShader ); The only parameter that must be provided is the handle to the vertex shader. This function executes the vertex shader as often as there are vertices. Free Vertex Shader Resources Vertex shader resources must be freed with a call to if ( m_dwVertexShader != 0xffffffff )
+{
+  m_pd3dDevice->DeleteVertexShader( m_dwVertexShader );
+  m_dwVertexShader = 0xffffffff;
+} This example frees the vertex shader resources in the InvalidateDeviceObjects() framework function, because this has to happen in case of a change of the window size or a device. Non-Shader specific Code The non-shader specific code of RacorX deals with setting render states and the handling of the vertex and index buffer. A few render states have to be set in RestoreDeviceObjects(): // z-buffer enabled
+m_pd3dDevice->SetRenderState( D3DRS_ZENABLE, TRUE );
+
+// Turn off D3D lighting, since we are providing our own vertex shader lighting
+m_pd3dDevice->SetRenderState( D3DRS_LIGHTING, FALSE );
+
+// Turn off culling, so we see the front and back of the quad
+m_pd3dDevice->SetRenderState( D3DRS_CULLMODE, D3DCULL_NONE ); The first instructions enables the z-buffer (a corresponded flag has to be set in the constructor of the Direct3D framework class, so that the device is created with a z-buffer). The fixed-function lighting is not needed, so it is switched off with the second statement. To be able to see both sides of the quad, backface culling is switched off with the third statement. The vertex and index buffer is created in InitDeviceObjects(): // create and fill the vertex buffer
+// Initialize vertices for rendering a quad
+VERTEX Vertices[] =
+{
+// x y z
+{ -1.0f,-1.0f, 0.0f, },
+{ 1.0f,-1.0f, 0.0f, },
+{ 1.0f, 1.0f, 0.0f, },
+{ -1.0f, 1.0f, 0.0f, },
+};
+
+m_dwSizeofVertices = sizeof (Vertices);
+
+// Create the vertex buffers with four vertices
+if( FAILED( m_pd3dDevice->CreateVertexBuffer( 4 * sizeof(VERTEX),
+     	D3DUSAGE_WRITEONLY , sizeof(VERTEX), D3DPOOL_MANAGED, &m_pVB ) ) )
+  return E_FAIL;
+
+// lock and unlock the vertex buffer to fill it with memcpy
+VOID* pVertices;
+if( FAILED( m_pVB->Lock( 0, m_dwSizeofVertices, (BYTE**)&pVertices, 0 ) ) )
+  return E_FAIL;
+memcpy( pVertices, Vertices, m_dwSizeofVertices);
+m_pVB->Unlock();
+
+// create and fill the index buffer
+// indices
+WORD wIndices[]={0, 1, 2, 0, 2, 3};
+
+m_wSizeofIndices = sizeof (wIndices);
+
+// create index buffer
+if(FAILED (m_pd3dDevice->CreateIndexBuffer(m_wSizeofIndices, 0,
+       	D3DFMT_INDEX16, D3DPOOL_MANAGED, &m_pIB)))
+  return E_FAIL;
+
+// fill index buffer
+VOID *pIndices;
+if (FAILED(m_pIB->Lock(0, m_wSizeofIndices, (BYTE **)&pIndices, 0)))
+  return E_FAIL;
+memcpy(pIndices, wIndices, m_wSizeofIndices);
+m_pIB->Unlock(); The four vertices of the quad are stored in a VERTEX structure, which holds for each vertex three FLOAT values for the position. By using the flag D3DFMT_INDEX16 in CreateIndexBuffer(), 16-bit variables are used to store the indices into the wIndices structure. So the maximum number of available indices are 64 k. Both buffers use a managed memory pool with D3DPOOL_MANAGED, so they will be cached in the system memory. D3DPOOL_MANAGED resources are read from the system memory which is quite fast and they are written to the system memory and afterwards uploaded to wherever the non-system copy has to go (AGP or VIDEO memory). This upload happens when the resource is unlocked. So there are always two copies of a resource, one in the system and one in the AGP or VIDEO memory. This is a less efficient but bullet-proof way. It works for any class of driver and must be used with unified memory architecture boards. Handling resources with D3DPOOL_DEFAULT is more efficient. In this case the driver will choose the best place for the resource. Why do we use a vertex buffer at all ? The vertex buffer can be stored in the memory of your graphic card or AGP, where it can be accessed very quickly by 3-D hardware. So a copy between system memory and the graphic card/AGP memory could be avoided. This is important for hardware that accelerates transformation and lighting. Without vertex buffers a lot of bus-traffic would happen by transforming and lighting the vertices. Why do we use an index buffer ? You will get the maximum performance when you reduce the duplication in vertices transformed and sent across the bus to the rendering device. A nonindexed triangle list for example achieves no vertex sharing, so it's the least optimal method, because DrawPrimitive*() is called several times. Using indexed lists or strips reduce the call overhead of DrawPrimitive*() methods (Reducing DrawPrimitve*() methods is also called batching) and because of the reduction of vertices to send through the bus, it saves memory bandwidth. Indexed strips are more hardware-cache friendly on newer hardware than indexed lists. The performance of index processing operations depends heavily on where the index buffer exists in memory. At the time of this writing, the only graphic cards that supports index buffers in hardware are the RADEON 8x00 series. Summarize RacorX shows a simple vertex shader together with its infrastructure. The shader is inlined in racorx.cpp and compiled with D3DXAssembleShader(). It uses four dp4 instructions for the transformation of the quad and only one material color. The upcoming examples are build on this example and only the functional additions will be shown on the next pages. RacorX2 The main difference between RacorX and RacorX2 (see attached resource file) is the compilation of the vertex shader with NVASM. Whereas the first example compiles the vertex shader with D3DXAssembleShader() while the application starts up, RacorX2 uses a pre-compiled vertex shader. To add the NVIDIA vertex and pixel shader assembler, you have to do the following steps: Create a directory, for example <C:\NVASM>: and unzip nvasm.exe and the documentation into it Show your Visual C++ IDE the path to this exe with <Tools->Options->Directories> and choose from the drop down menu <Show directories for:> <Executable files> Add the path to NVASM <C:\NVASM> Now the dialog box should look like this: Figure 7 - Integrating NVASM into Visual C/C++ Additionally you have to tell every vertex shader file in the IDE, that it has to be compiled with NVASM. The easiest way to do that is looking into the example RacorX2. Just fire up your Visual C++ IDE by clicking on the <RacorX.dsp> in the RacorX2 directory. Click on the <FileView> tab of the Workspace dialog and there on <Shaders> to view the available shader files. A right-click on the file <basic.vsh> should show you a popup. Click on <Settings...>. The project settings of your project might look like: Figure 8 - Custom Build Options Vertex Shader Files The entry in the entry field called "Commands" is: nvasm.exe $(InputPath) shaders\$(InputName).vso For the entry field named "Outputs", I use the input name as the name for the output file with an *.vso extension. The output directory should be the shaders directory. ShaderX author Kenneth Hurley is the author of NVASM. Read more in his paper [Hurley]. The output of NVASM in the build window of your Visual C/C++ IDE should look like this: Figure 9 - NVASM Output The vertex shader is provided in its own ASCII file called basic.vsh. After compilation a binary object file with the name basic.vso is created in the directory <shaders>: Figure 10 - Directory Content RacorX2 Creating a Vertex Shader Because of the already compiled vertex shader, the creation of the vertex shader has to be done in a different way than in the previous example. This happens in the InitDeviceObjects() function: //shader decl
+DWORD dwDecl[] =
+{
+  D3DVSD_STREAM(0),
+  D3DVSD_REG(0, D3DVSDT_FLOAT3 ), // input register 0
+  D3DVSD_END()
+};
+
+// loads a *.vso binary file, already compiled with NVASM and
+// creates a vertex shader
+if (FAILED(CreateVSFromCompiledFile (m_pd3dDevice, dwDecl,"shaders/basic.vso",
+                                 	&m_dwVertexShader)))
+   return E_FAIL; CreateVSFromCompiledFile() opens and reads in the binary vertex shader file and creates a vertex shader. The source of this function can be found at the end of the file racorx.cpp in the RacorX2 directory: //----------------------------------------------------------------------------
+// Name: CreateVSFromBinFile
+// Desc: loads a binary *.vso file that was compiled by NVASM
+// and creates a vertex shader
+//----------------------------------------------------------------------------
+HRESULT CMyD3DApplication::CreateVSFromCompiledFile (IDirect3DDevice8* m_pd3dDevice,
+                                                 	DWORD* dwDeclaration,
+                                                 	TCHAR* strVSPath,
+                                                 	DWORD* m_dwVS)
+{
+  char szBuffer[128]; // debug output
+  DWORD* dwpVS; // pointer to address space of the calling process
+  HANDLE hFile, hMap; // handle file and handle mapped file
+  TCHAR tempVSPath[512]; // temporary file path
+  HRESULT hr; // error
+
+if( FAILED( hr = DXUtil_FindMediaFile( tempVSPath, strVSPath ) ) )
+  return D3DAPPERR_MEDIANOTFOUND;
+
+hFile = CreateFile(tempVSPath, GENERIC_READ,0,0,OPEN_EXISTING,
+               	FILE_ATTRIBUTE_NORMAL,0);
+
+if(hFile != INVALID_HANDLE_VALUE)
+{
+  if(GetFileSize(hFile,0) > 0)
+  hMap = CreateFileMapping(hFile,0,PAGE_READONLY,0,0,0);
+  else
+  {
+    CloseHandle(hFile);
+  return E_FAIL;
+  }
+}
+else
+  return E_FAIL;
+
+// maps a view of a file into the address space of the calling process
+dwpVS = (DWORD *)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+
+// Create the vertex shader
+hr = m_pd3dDevice->CreateVertexShader( dwDeclaration, dwpVS, m_dwVS, 0 );
+if ( FAILED(hr) )
+{
+  OutputDebugString( "Failed to create Vertex Shader, errors:\n" );
+  D3DXGetErrorStringA(hr,szBuffer,sizeof(szBuffer));
+  OutputDebugString( szBuffer );
+  OutputDebugString( "\n" );
+return hr;
+}
+
+  UnmapViewOfFile(dwpVS);
+  CloseHandle(hMap);
+  CloseHandle(hFile);
+
+  return S_OK;
+} DXUtil_FindMediaFile(), a helper function located in the framework file dxutil.cpp, returns the path to the already compiled vertex shader file. CreateFile() opens and reads the existing file: HANDLE CreateFile(
+  LPCTSTR lpFileName, // file name
+  DWORD dwDesiredAccess, // access mode
+  DWORD dwShareMode, // share mode
+  LPSECURITY_ATTRIBUTES lpSecurityAttributes, // SD
+  DWORD dwCreationDisposition, // how to create
+  DWORD dwFlagsAndAttributes, // file attributes
+  HANDLE hTemplateFile // handle to template file
+); Its first parameter is the path to the file. The flag GENERIC_READ specifies read access to the file in the second parameter. The following two parameters are not used, because file sharing should not happen and the fourth parameter is not used, because the file should not be inherited by a child process. The fifth parameter is set to OPEN_EXISTING. This way, the function fails if the file does not exist. Setting the sixt parameter to FILE_ATTRIBUTE_NORMAL indicates, that the file has no other attributes. A template file is not used here, so the last parameter is set to 0. Please consult the Platform SDK help file for more information. CreateFileMapping() creates or opens a named or unnamed file-mapping object for the specified file: HANDLE CreateFileMapping(
+  HANDLE hFile, // handle to file
+  LPSECURITY_ATTRIBUTES lpAttributes, // security
+  DWORD flProtect, // protection
+  DWORD dwMaximumSizeHigh, // high-order DWORD of size
+  DWORD dwMaximumSizeLow, // low-order DWORD of size
+  LPCTSTR lpName // object name
+); The first parameter is a handle to the file from which to create a mapping object. The file must be opened with an access mode compatible with the protection flags specified by the flProtect parameter. We have opened the file in CreateFile() with GENERIC_READ, therefore we use PAGE_READONLY here. Other features of CreateFileMapping() are not needed, therefore we set the rest of the parameters to 0. MapViewOfFile() function maps a view of a file into the address space of the calling process: LPVOID MapViewOfFile(
+  HANDLE hFileMappingObject, // handle to file-mapping object  
+  DWORD dwDesiredAccess, // access mode
+  DWORD dwFileOffsetHigh, // high-order DWORD of offset
+  DWORD dwFileOffsetLow, // low-order DWORD of offset
+  SIZE_T dwNumberOfBytesToMap // number of bytes to map
+); This function only gets the handle to the file-mapping object from CreateFileMapping() and in the second parameter the access mode FILE_MAP_READ. The access mode parameter specifies the type of access to the file view and, therefore, the protection of the pages mapped by the file. More features are not needed, therefore the rest of the parameters are set to 0. CreateVertexShader() is used to create and validate a vertex shader. It takes the vertex shader declaration (which maps vertex buffer streams to different vertex input registers) in its first parameter as a pointer and returns the shader handle in the third parameter. The second parameter gets the vertex shader instructions of the binary code pre-compiled by a vertex shader assembler. With the fourth parameter you can force software vertex processing with D3DUSAGE_SOFTWAREPROCESSING. As in the previous example OutputDebugString() shows the complete error message in the output debug window of the Visual C/C++ IDE and D3DXGetErrorStringA() interprets all Direct3D and Direct3DX HRESULTS and returns an error message in szBuffer. Summarize This example showed the integration of NVASM to pre-compile a vertex shader and how to open and read a binary vertex shader file. RacorX3 The main improvement of RacorX3 (see attached resource file) over RacorX2 is the addition of a per-vertex diffuse reflection model in the vertex shader. This is one of the simplest lighting calculations, which outputs the color based on the dot product of the vertex normal with the light vector. RacorX3 uses a light positioned at (0.0, 0.0, 1.0) and a green color. Figure 11 - RacorX3 As usual we are tracking the life-cycle of the vertex shader. Vertex Shader Declaration The vertex shader declaration has to map vertex data to specific vertex shader input registers. Additionally to the previous examples, we need to map a normal vector to the input register v3: // vertex shader declaration
+DWORD dwDecl[] =
+{
+  D3DVSD_STREAM(0),
+  D3DVSD_REG(0, D3DVSDT_FLOAT3 ), // input register #1
+  D3DVSD_REG(3, D3DVSDT_FLOAT3 ), // normal in input register #4
+  D3DVSD_END()
+}; The corresponding layout of the vertex buffer looks like this: struct VERTICES
+{
+  FLOAT x, y, z; // The untransformed position for the vertex
+  FLOAT nx, ny, nz; // the normal
+};
+
+// Declare custom FVF macro.
+#define D3DFVF_VERTEX (D3DFVF_XYZ|D3DFVF_NORMAL) Each vertex consists of three position floating point values and three normal floating point values in the vertex buffer. The vertex shader gets the position and normal values from the vertex buffer via v0 and v3. Setting the Vertex Shader Constant Registers The vertex shader constants are set in FrameMove() and RestoreDeviceObjects(). This example uses a more elegant way to handle the constant registers. The file const.h that is included in racorx.cpp and diffuse.vsh, gives the constant registers an easier to remember name: #define CLIP_MATRIX 0
+#define CLIP_MATRIX_1 1
+#define CLIP_MATRIX_2 2
+#define CLIP_MATRIX_3 3
+
+#define INVERSE_WORLD_MATRIX   4
+#define INVERSE_WORLD_MATRIX_1 5
+#define INVERSE_WORLD_MATRIX_2 6
+
+#define LIGHT_POSITION 11
+
+#define DIFFUSE_COLOR 14
+#define LIGHT_COLOR 15 In FrameMove() a clipping matrix and an inversed world matrix are set into the constant registers: HRESULT CMyD3DApplication::FrameMove()
+{
+  // rotates the object about the y-axis
+  D3DXMatrixRotationY( &m_matWorld, m_fTime * 1.5f );
+
+  // set the clip matrix
+  m_pd3dDevice->SetVertexShaderConstant(CLIP_MATRIX, &(m_matWorld *
+                                        m_matView * m_matProj), 4);
+  D3DXMATRIX matWorldInverse;
+  D3DXMatrixInverse(&matWorldInverse, NULL, &m_matWorld);
+  m_pd3dDevice->SetVertexShaderConstant(INVERSE_WORLD_MATRIX,
+                                        &matWorldInverse,3);
+
+ return S_OK;
+} Contrary to the previous examples, the concatenated world-, view- and projection matrix, which is used to rotate the quad, is not transposed here. This is because the matrix will be transposed in the vertex shader as shown below. To transform the normal, an inverse 4x3 matrix is send to the vertex shader via c4 -c6. The Vertex Shader The vertex shader is a little bit more complex, than the one used in the previous examples: ; per-vertex diffuse lighting
+
+#include "const.h"
+
+vs.1.1
+; transpose and transform to clip space
+mul r0, v0.x, c[CLIP_MATRIX]
+mad r0, v0.y, c[CLIP_MATRIX_1], r0
+mad r0, v0.z, c[CLIP_MATRIX_2], r0
+add oPos, c[CLIP_MATRIX_3], r0
+
+; transform normal
+dp3 r1.x, v3, c[INVERSE_WORLD_MATRIX]
+dp3 r1.y, v3, c[INVERSE_WORLD_MATRIX_1]
+dp3 r1.z, v3, c[INVERSE_WORLD_MATRIX_2]
+
+; renormalize it
+dp3 r1.w, r1, r1
+rsq r1.w, r1.w
+mul r1, r1, r1.w
+
+; N dot L
+; we need L vector towards the light, thus negate sign
+dp3 r0, r1, -c[LIGHT_POSITION]
+
+mul r0, r0, c[LIGHT_COLOR] ; modulate against light color
+mul oD0, r0, c[DIFFUSE_COLOR] ; modulate against material The mul, mad and add instructions transpose and transform the matrix provided in c0 - c3 to clip space. As such they are nearly functionally equivalent to the transposition of the matrix and the four dp4 instructions shown in the previous examples. There are two caveats to bear in mind: The complex matrix instructions like m4x4 might be faster in software emulation mode and v0.w is not used here. oPos.w is automatically filled with 1. These instructions should save the CPU cycles used for transposing. The normals are transformed in the following three dp3 instructions and then renormalized with the dp3, rsq and mul instructions. You can think of a normal transform in the following way: Normal vectors (unlike position vectors) are simply directions in space, and as such they should not get squished in magnitude, and translation doesn't change their direction. They should simply be rotated in some fashion to reflect the change in orientation of the surface. This change in orientation is a result of rotating and squishing the object, but not moving it. The information for rotating a normal can be extracted from the 4x4 transformation matrix by doing transpose and inversion. A more math-related explanation is given in [Haines/Möller][Turkowski]. So the bullet-proof way to use normals, is to transform the transpose of the inverse of the matrix, that is used to transform the object. If the matrix used to transform the object is called M, then we must use the matrix, N, below to transform the normals of this object. N = transpose( inverse(M) ) The normal can be transformed with the transformation matrix (usually the world matrix), that is used to transform the object in the following cases: Matrix formed from rotations (orthogonal matrix), because the inverse of an orthogonal matrix is its transpose Matrix formed from rotations and translation (rigid-body transforms), because translations do not affect vector direction Matrix formed from rotations and translation and uniform scalings, because such scalings affect only the length of the transformed normal, not its direction. A uniform scaling is simply a matrix which uniformly increases or decreases the object’s size, vs. a non-uniform scaling, which can stretch or squeeze an object. If uniform scalings are used, then the normals do have to be renormalized. Therefore using the world matrix would be sufficient in this example. That's exactly, what the source is doing. The inverse world matrix is delivered to the vertex shader via c4 - c6. The dp3 instruction handles the matrix in a similar way as dp4. By multiplying a matrix with a vector, each column of the matrix should be multiplied with each component of the vector. dp3 and dp4 are only capable to multiply each row of the matrix with each component of the vector. In case of the position data, the matrix is transposed to get the right results. In case of the normals, no transposition is done. So dp3 calculates the dot product by multiplying the rows of the matrix with the components of the vector. This is like using a transposed matrix. The normal is re-normalized with the dp3, rsq and mul instructions. Re-normalizing a vector means align its length to 1. That's because we need a unit vector to calculate our diffuse lighting effect. To calculate a unit vector, divide the vector by its magnitude or length. The magnitude of vectors is calculated by using the Pythagorean theorem: x2 + y2 + z2 = m2 The length of the vector is retrieved by ||A|| = sqrt(x2 + y2 + z2) The magnitude of a vector has a special symbol in mathematics. It is a capital letter designated with two vertical bars: ||A||. So dividing the vector by its magnitude is: UnitVector = Vector / sqrt(x2 + y2 + z2) The lines of code in the vertex shader, that handles the calculation of the unit vector looks like this: ; renormalize it
+dp3 r1.w, r1, r1  ; (src1.x * src2.x) + (src1.y * src2.y) + (src1.z * src2.z)
+rsq r1.w, r1.w    ; if (v != 0 && v != 1.0) v = (float)(1.0f / sqrt(v))
+mul r1, r1, r1.w  ; r1 * r1.w dp3 squares the x, y and z components of the temporary register r1, adds them and returns the result in r1.w. rsq divides 1 by the result in r1.w and stores the result in r1.w. mul multiplies all components of r1 with r1.w. Afterwards, the result in r1.w is not used anymore in the vertex shader. The underlying calculation of these three instructions can be represented by the following formula, which is mostly identical to the formula postualted above: UnitVector = Vector * 1/sqrt(x2 + y2 + z2) Lighting is calculated with the following three instruction: dp3 r0, r1, -c[LIGHT_POSITION]
+mul r0, r0, c[LIGHT_COLOR] ; modulate against light color
+mul oD0, r0, c[DIFFUSE_COLOR] ; modulate against diffuse color Nowadays the lighting models used in current games are not based on much physical theory. Game programmers use approximations that try to simulate the way photons are reflected from objects in a rough but efficient manner. One differentiates usually between different kind of light sources and different reflection models. The common lighting sources are called directional, point light and spotlight. The most common reflections models are ambient, diffuse and specular lighting. This example uses a directional light source with an ambient and a diffuse reflection model. Directional Light RacorX3 uses a light source in an infinite distance. This simulates the long distance the light beams have to travel from the sun. We treat this light beams as beeing parallel. This kind of light source is called directional light source. Diffuse Reflection Whereas ambient light is considered to be uniform from any direction, diffuse light simulates the emission of an object by a particular light source. Therefore you are able to see that light falls onto the surface of an object from a particular direction by using the diffuse lighting model. It is based on the assumption that light is reflected equally well in all directions, so the appearance of the reflection does not depend on the position of the observer. The intensity of the light reflected in any direction depends only on how much light falls onto the surface. If the surface of the object is facing the light source, which means is perpendicular to the direction of the light, the density of the incident light is the highest. If the surface is facing the light source under some angle smaller than 90 degrees, the density is proportionally smaller. The diffuse reflection model is based on a law of physics called Lambert's Law, which states that for ideally diffuse (totally matte) surfaces, the reflected light is determined by the cosine between the surface normal N and the light vector L. Figure 12 - Diffuse Lighting The left figure shows a geometric interpretation of Lambert's Law (see also [RTR]). The middle figure shows the light rays hitting the surface perpendicularly in a distance d apart. The intensity of the light is related to this distance. It decreases as d becomes greater. This is shown by the right figure. The light rays make an angle ø with the normal of the plane. This illustrates that the same amount of light that passes through one side of a right-angle triangle is reflected from the region of the surface corresponding to the triangles hypotenuse. Due to the relationships that hold in a right-angle triangle, the length of the hypotenuse is d/cos ø of the length of the considered side. Thus you can deduce that if the intensity of the incident light is Idirected, the amount of light reflected from a unit surface is Idirected cos ø. Adjusting this with a coefficient that describes reflection properties of the matter leads to the following equation (see also [Savchenko]): Ireflected = Cdiffuse * Idirected cos ø This equation demonstrates that the reflection is at its peak for surfaces that are perpendicular to the direction of light and diminishes for smaller angles, because the cosinus value is very large. The light is obscured by the surface if the angles is more than 180 or less than 0 degrees, because the cosinus value is small. You will obtain negative intensity of the reflected light, which will be clamped by the output registers. In an implementation of this model, you have to find a way to compute cos ø. By definition the dot or scalar product of the light and normal vector can be expressed as N dot L = ||N|| ||L||cos ø where ||N|| and ||L|| are the lengths of the vectors. If both vectors are unit length, you can compute cos ø as the scalar or dot product of the light and normal vector. Thus the expression is Ireflected = Cdiffuse * Idirected(N dot L) So (N dot L) is the same as the cosine of the angle between N and L, therefore as the angle decrease, the resulting diffuse value is higher. This is exactly what the dp3 instruction and the first mul instruction are doing. Here is the source with the relevant part of constant.h: #define LIGHT_POSITION 11
+#define MATERIAL_COLOR 14
+
+-----
+dp3 r0, r1, -c[LIGHT_POSITION]
+
+mul r0, r0, c[LIGHT_COLOR] ; modulate against light color
+mul oD0, r0, c[DIFFUSE_COLOR] ; modulate against material So the vertex shader registers are involved in the following way: r0 = (r1 dot -c11) * c14 This example modulates additionally against the blue light color in c15: r0 = (c15 * (r1 dot -c11)) * c14 Summarize RacorX3 shows the usage of an include file to give constants a name that can be remembered in a better way. It shows how to normalize vectors and it just strive the problem of transforming normals, but shows a bullet-proof method to do it. The example introduces an optimization technique, that eliminates the need to transpose the clip space matrix with the help of the CPU and it shows the usage of a simple diffuse reflection model, that lights the quad on a per-vertex basis. RacorX4 RacorX4 (see attached resource file) has gotten a few additional features compared to RacorX3. First of all this example will not use a plain quad anymore, it uses instead a Bézier patch class, that shows a round surface with a texture attached to it. To simulate light reflections, a combined diffuse and specular reflection model is used. Figure 13 - RacorX4 RacorX4 uses the trackball class provided with the Common files framework, to rotate and move the object. You can choose different specular colors with the <C> key and zoom in and out with the mouse wheel. Vertex Shader Declaration Compared to RacorX3, additionally the texture coordinates will be mapped to input register v7. // shader decl
+DWORD dwDecl[] =
+{
+  D3DVSD_STREAM(0),
+  D3DVSD_REG(0, D3DVSDT_FLOAT3 ), // input register v0
+  D3DVSD_REG(3, D3DVSDT_FLOAT3 ), // normal in input register v3
+  D3DVSD_REG(7, D3DVSDT_FLOAT2), // tex coordinates
+  D3DVSD_END()
+}; The corresponding layout of the vertex buffer in BPatch.h looks like: struct VERTICES {
+  D3DXVECTOR3 vPosition;
+  D3DXVECTOR3 vNormal;
+  D3DXVECTOR2 uv;
+};
+
+// Declare custom FVF macro.
+#define D3DFVF_VERTEX (D3DFVF_XYZ|D3DFVF_NORMAL|D3DFVF_TEX1) The third flag used in the custom FVF macro indicates the usage of one texture coordinate pair. This macro is provided to CreateVertexBuffer(). The vertex shader gets the position values from the vertex buffer via v0, the normal values via v3 and the two texture coordinates via v7. Setting the Vertex Shader Constants The vertex shader constants are set in FrameMove() and RestoreDeviceObjects(). The file const.h holds the following defines: #define CLIP_MATRIX 0
+#define CLIP_MATRIX_1 1
+#define CLIP_MATRIX_2 2
+#define CLIP_MATRIX_3 3
+
+#define INVERSE_WORLD_MATRIX 8
+#define INVERSE_WORLD_MATRIX_1 9
+#define INVERSE_WORLD_MATRIX_2 10
+
+#define LIGHT_VECTOR 11
+#define EYE_VECTOR 12
+#define SPEC_POWER 13
+#define SPEC_COLOR 14 In FrameMove() a clipping matrix, the inversed world matrix, an eye vector and a specular color are set: // set the clip matrix
+m_pd3dDevice->SetVertexShaderConstant(CLIP_MATRIX,
+           	&(m_matWorld * m_matView * m_matProj),4);
+
+// set the world inverse matrix
+D3DXMATRIX matWorldInverse;
+D3DXMatrixInverse(&matWorldInverse, NULL, &m_matWorld);
+m_pd3dDevice->SetVertexShaderConstant(INVERSE_WORLD_MATRIX, matWorldInverse,3);
+
+// stuff for specular lighting
+// set eye vector E
+m_pd3dDevice->SetVertexShaderConstant(EYE_VECTOR, vEyePt,1);
+
+// specular color
+if(m_bKey['C'])
+{
+  m_bKey['C']=0;
+  ++m_dwCurrentColor;
+  if(m_dwCurrentColor >= 3)
+    m_dwCurrentColor=0;
+}
+m_pd3dDevice->SetVertexShaderConstant(SPEC_COLOR, m_vLightColor[m_dwCurrentColor], 1); Like in the previous example the concatenated world-, view- and projection matrix are set into c0 - c3, to get transposed in the vertex shader and the inverse 4x3 world matrix is send to vertex shader, to transform the normal. The eye vector (EYE_VECTOR) that is used to build up the view matrix is stored in constant register c12. As shown below, this vector is helpful to build up the specular reflection model used in this upcoming examples. The user can pick one of the following specular colors with the <C> key: m_vLightColor[0]=D3DXVECTOR4(0.3f,0.1f,0.1f,1.0f);
+m_vLightColor[1]=D3DXVECTOR4(0.1f,0.5f,0.1f,1.0f);
+m_vLightColor[2]=D3DXVECTOR4(0.0f,0.1f,0.4f,1.0f); In RestoreDeviceObjects() the specular power, the light vector and the diffuse color are set: // specular power
+m_pd3dDevice->SetVertexShaderConstant(SPEC_POWER, D3DXVECTOR4(0,10,25,50),1);
+
+// light direction
+D3DXVECTOR3 vLight(0,0,1);
+m_pd3dDevice->SetVertexShaderConstant(LIGHT_VECTOR, vLight,1);
+
+D3DXCOLOR matDiffuse(0.9f, 0.9f, 0.9f, 1.0f);
+m_pd3dDevice->SetVertexShaderConstant(DIFFUSE_COLOR, &matDiffuse, 1); As in the previous examples, the light is positioned at (0.0, 0.0, 1.0). There are four specular power values, from which one will be used in the vertex shader. To optimize the usage of SetVertexShaderConstant(), the specular color could be set into the fourth component of the light vector, which only used three of its components. The Vertex Shader The vertex shader handles a combined diffuse and specular reflection model: ; diffuse and specular vertex lighting
+
+#include "const.h"
+
+vs.1.1
+; transpose and transform to clip space
+mul r0, v0.x, c[CLIP_MATRIX]
+mad r0, v0.y, c[CLIP_MATRIX_1], r0
+mad r0, v0.z, c[CLIP_MATRIX_2], r0
+add oPos, c[CLIP_MATRIX_3], r0
+
+; output texture coords
+mov oT0, v7
+
+; transform normal
+dp3 r1.x, v3, c[INVERSE_WORLD_MATRIX]
+dp3 r1.y, v3, c[INVERSE_WORLD_MATRIX_1]
+dp3 r1.z, v3, c[INVERSE_WORLD_MATRIX_2]
+
+; renormalize it
+dp3 r1.w, r1, r1
+rsq r1.w, r1.w
+mul r1, r1, r1.w
+
+; light vector L
+; we need L towards the light, thus negate sign
+mov r5, -c[LIGHT_VECTOR]
+
+; N dot L
+dp3 r0.x, r1, r5
+
+; compute normalized half vector H = L + V
+add r2, c[EYE_VECTOR], r5 ; L + V
+
+; renormalize H
+dp3 r2.w, r2, r2
+rsq r2.w, r2.w
+mul r2, r2, r2.w
+
+; N dot H
+dp3 r0.y, r1, r2
+
+; compute specular and clamp values (lit)
+; r0.x - N dot L
+; r0.y - N dot H
+; r0.w - specular power n
+mov r0.w, c[SPEC_POWER].y ; n must be between –128.0 and 128.0
+lit r4, r0
+
+; diffuse color * diffuse intensity(r4.y)
+mul oD0, c[DIFFUSE_COLOR], r4.y
+
+; specular color * specular intensity(r4.z)
+mul oD1, c[SPEC_COLOR], r4.z Compared to the vertex shader in the previous example program, this shader maps the texture coordinates to texture stage 0 with the following instruction: ; output texture coords
+mov oT0, v7 The corresponding texture stage states set for the shading of the pixels in the multitexturing unit will be shown below in the section named "Non-Shader specific code". The instructions that transform the normal and calculate the diffuse reflection were already discussed along with the previous example. The real new functionality in this shader is the calculation of the specular reflection, which happens in the code lines starting with the add instruction. Specular Reflection Compared to the diffuse reflection model, the appearance of the reflection depends in the specular reflection model on the position of the viewer. When the direction of the viewing coincides, or nearly coincides, with the direction of specular reflection, a bright highlight is observed. This simulates the reflection of a light source by a smooth, shiny and polished surface. To describe reflection from shiny surfaces an approximation is commonly used, which is called the Phong illumination model (not to be confused with Pong Shading), named after its creator Phong Bui Tong [Foley]. According to this model, a specular highlight is seen when the viewer is close to the direction of reflection. The intensity of light falls off sharply when the viewer moves away from the direction of the specular reflection. Figure 14 - Vectors for Specular Reflection A model describing this effect has to be aware of at least the location of the light source L, the location of the viewer V, and the orientation of the surface N. Additionally a vector R that describes the direction of the reflection might be useful. The half way vector H, that halfs the angle between L and V will be introduced below. The original Phong formula approximates the falloff of the intensity. It looks like this: kspecular cosn(ß) where kspecular is a scalar coefficient showing the percentage of the incident light reflected. ß describes the angle between R and V. The exponent n characterizes the shiny properties of the surface and ranges from one to infinity. Objects that are matte require a small exponent, since they produce a large, dim, specular highlight with a gentle falloff. Shiny surfaces should have a sharp highlight that is modeled by a very large exponent, making the intensity falloff very steep. Together with the diffuse reflection model shown above, the Phong illumination model can be expressed in the following way: Ireflected = Idirected((N dot L) + kspecular cosn(ß)) cosn(ß) can be replaced by using the mechanism of the dot or scalar product of the unit vectors R and V: Ireflected = Idirected((N dot L) + kspecular (R dot V)n) This is the generally accepted phong reflection equation. As the angle between V and R decreases, the specularity will rise. Because it is expensive to calculate the reflection vector R (mirror of light incidence around the surface normal), James F. Blinn [Blinn] introduced a way to do this using an imaginary vector H, which is defined as halfway between L and V. H is therefore: H = (L + V) / 2 When H coincides with N, the direction of the reflection coincides with the viewing direction V and a specular hightlight is observed. So the original formula (R dot V)n is expanded to (N dot ((L + V) / 2))n or (N dot H)n The complete Blinn-Phong model formula looks like: Ireflected = Idirected((N dot L) + kspecular (N dot H)n) Now back to the relevant code piece that calculates the specular reflection: [indent=1][code=auto:0]; compute normalized half vector H = L + V add r2, c[EYE_VECTOR], r5 ; L + V ; renormalize H dp3 r2.w, r2, r2 rsq r2.w, r2.w mul r2, r2, r2.w ; N Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Graphics Programming and Theory » Article: Introduction to Shader Programming Part II: Programming Vertex Shaders English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

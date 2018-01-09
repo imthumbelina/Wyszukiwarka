@@ -1,0 +1,378 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » APIs and Tools » Article: The Simple DirectMedia Layer from a WIN32 Perspective, Part 2: SDL Video Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This The Simple DirectMedia Layer from a Win32 Perspective, Part 1: Setting Up Your System for SDL SDL & Fonts Part 2: PrintStrings SDL & Fonts Sound Formats and Their Uses in Games Game Programming Genesis Part V : Palettes and Pixels in DirectDraw Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike The Simple DirectMedia Layer from a WIN32 Perspective, Part 2: SDL Video By Ernest Pazera | Published Dec 17 2001 05:27 PM in APIs and Tools sdl members color sdl_color format rect structure palette Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource December 5, 2001 Mission Statement Graphics make the game/application. There is no question about this. In WIN32, if you intend to do 2D graphics, you normally have two choices: GDI or DirectDraw. GDI is slow as hell, and DirectDraw is Microsoft specific. Porting an application that uses either GDI or DirectDraw to a non-WIN32 platform can be painful. One of your other options is SDL's video component. Keep in mind that SDL can only be used (by itself) for 2D graphics. If you want 3D graphics, though, SDL works well with OpenGL. For the purposes of this article, we are going to talk only about SDL's 2D graphical capabilities. Here are the TGOs*(Topical Guide Objectives) for this article. TGO-02-A   Know the basic structures SDL uses for doing graphics TGO-02-B   Know how to get information from the SDL video subsystem. TGO-02-C   Know how to create and destroy various types of SDL surfaces TGO-02-D   Know how to work with SDL surfaces TGO-02-D1 Know how to do filled rectangles TGO-02-D2 Know how to get and set pixels TGO-02-D3 Know how to blit from one surface to another TGO-02-D4 Know how to use color keys TGO-02-D5 Know how to clip output *About TGOs: The concept of TGOs I borrowed from the United States Navy. In training programs, the specific knowledge that you are responsible for having are all listed in a book of Topical Guide Objectives. This book is referred to as the "Topical Guide". TGOs are good for both the reader and the author, as it lets the reader know exactly what he or she will be learning at a glance, and it reminds the author exactly what he will be covering. Basic Structures (TGO-02-A) As of version 1.2.3 of SDL, there are seven structures in the library that deal with the video subsystem. These are SDL_Rect, SDL_Color, SDL_Palette, SDL_PixelFormat, SDL_Surface, SDL_VideoInfo, and SDL_Overlay. Most of them do exactly what you'd expect them to do. We're going to cover the first six of these (leaving out SDL_Overlay). SDL_Rect SDL_Rect is one of the simpler structures. As you probably guessed, it abstracts a rectangular area on the screen. Here's what it looks like: typedef struct{
+  Sint16 x, y;
+  Uint16 w, h;
+} SDL_Rect; This is a pretty standard rectangle structure, unless of course you are used to working with the WIN32 RECT structure. The x and y members contain the upper left hand corner. The w and h members contain the width and height. All of these members measure units in pixels (and never anything but pixels). A brief note about some of the odd looking types used in SDL: because it is cross platform, the writers of SDL had to make some integral types that would be the same size no matter what platform they were used on. Considering differences between platforms and the size of the int type, they came up with things like Sint16 and Uint16, there are a number of types like these. They all take the form: [S|U]int[n] In front of the type name, you will see either an S or a U. S stands for "signed" and U stands for "unsigned". n is a number, either 8, 16, or 32. In the case of SDL_Rect, x and y are Sint16s, and so they range from -32768 to +32767, which is more than enough to deal with rectangular areas of the screen. The w and h members are Uint16s, and so can range from 0 to 65535. Notice that these are always non-negative, since you cannot have a rectangle with a negative width or height (unlike in the WIN32 RECT structure). A point (x,y) lies within a rectangle (rect) if the all of the following are true: x >= rect.x
+y >= rect.y
+x < ( rect.x + rect.w )
+y < ( rect.y + rect.h ) If a rectangles w or h members are 0, it is an empty rectangle, and it contains no points whatsoever. There are absolutely no functions whatsoever for working with SDL_Rects (like the ones they have for WIN32 RECTs, like OffsetRect or UnionRect or IntersectRect), so if you need them, you have to make them yourself. SDL_Color The second structure is just as simple. SDL_Color abstracts an RGB color value in an independent way. Here's what it looks like: typedef struct{
+  Uint8 r;
+  Uint8 g;
+  Uint8 b;
+  Uint8 unused;
+} SDL_Color; SDL_Color is a lot like the WIN32 PALETTEENTRY or RGBQUAD structure. It contains four Uint8 values (bytes), and each member can range from 0 to 255. The r, g, and b members represent a colors red, green, and blue value. The unused member is just that--unused. Just sort of pretend it doesn't exist. No functions exist for working with the SDL_Color structure either. If you want them, you can make your own, or just work with the members themselves. I personally like wrapping SDL_Color into a class. SDL_Palette In theory, the use of palettes has gone the way of the dinosaur. Still, there are times when they are useful, and so SDL has them. Palettes in SDL are strictly 8 bit palettes, for 256 different colors. However, you can make a palette whatever size you like, for example you could make one 256 color master palette, and then 8 different 8 color palettes that you use for palette animation and overwrite only a certain portion of the actual palette with those eight colors. The SDL_Palette structure is pretty simple: typedef struct{
+  int ncolors;
+  SDL_Color *colors;
+} SDL_Palette; The ncolors member is the number of colors in the palette. The colors member is a pointer to an array of SDL_Color values. You have to work with these members manually, allocating and deallocating colors, setting them, and so on. SDL doesn't include any functions for working with palettes, other than those that set the palette entries for a surface. SDL_Palette is roughly akin to IDirectDrawPalette, but without any of the encapsulation. SDL_PixelFormat This structure is highly useful. It is similar in purpose to the DDPIXELFORMAT structure of DirectDraw. It describes everything you'd ever want to know about how pixels are represented for a particular surface. Here's what it looks like: typedef struct{
+  SDL_Palette *palette;
+  Uint8  BitsPerPixel;
+  Uint8  BytesPerPixel;
+  Uint32 Rmask, Gmask, Bmask, Amask;
+  Uint8  Rshift, Gshift, Bshift, Ashift;
+  Uint8  Rloss, Gloss, Bloss, Aloss;
+  Uint32 colorkey;
+  Uint8  alpha;
+} SDL_PixelFormat; Everything you want to know about a pixel format is right here. First, the palette member is a pointer to an SDL_Palette, if the format has one. If not, this member will be NULL. Next, BitsPerPixel and BytesPerPixel specify how many bits and bytes are per pixel for this format (kind of obvious from the name, no?). The next group of members are Rmask, Gmask, Bmask, and Amask. These are the bit masks in the pixel format for each of the color components, Rmask for red, Gmask for green, Bmask for blue, and Amask for alpha. These are useful for using the & operator to isolate certain color components. The next group, Rshift, Gshift, Bshift, and Ashift specify the bit position in the pixel that begins the color component in question. After you take a pixel value and & with the Rmask value, you can >> by the Rshift value to get it in the lowest bits of the variable. Rloss, Gloss, Bloss, and Aloss is another group of members used for color conversion. These members contain the number of bits that are lost when starting from an 8 bit value. After you have & by the Rmask, and >> by the Rshift, you can << by Rloss, and you'll have a value in the range of 0 to 255 for your red component. This makes color conversion to and from SDL_Color values really easy. //color is an SDL_Color, and format is an SDL_PixelFormat
+//convert color to native format
+Uint32 native = 0 ;
+Uint32 red , green , blue ;
+red = color.r >> format.Rloss ;
+green = color.g >> format.Gloss ;
+blue = color.b >> format.Bloss ;
+red <<= format.Rshift ;
+green <<= format.Gshift ;
+blue <<= format.Bshift ;
+
+//convert native pixel to SDL_Color
+red = native & format.Rmask ;
+green = native & format.Gmask ;
+blue = native & format.Bmask ;
+red >>= format.Rshift ;
+green >>= format.Gshift ;
+blue >>= format.Bshift ;
+red <<= format.Rloss ;
+green <<= format.Gloss ;
+blue <<= format.Bloss ;
+color.r = red ;
+color.g = green ;
+color.b = blue ; Pretty simple, right? Don't worry too much about this code, though. SDL provides functions that will do these things for you. The colorkey member of SDL_PixelFormat stores the transparent color for the format. This color is in the native pixel format, not as an SDL_Color. Finally, the alpha member is an eight bit value that stores an overall alpha value for the surface. SDL_Surface Just like the IDirectDrawSurface object in DirectDraw and the HDC in GDI, the SDL_Surface is the most important structure in the SDL video subsystem. It abstracts a rectangular area of pixel data. Here's what it looks like: typedef struct SDL_Surface {
+  Uint32 flags;
+  SDL_PixelFormat *format;
+  int w, h;
+  Uint16 pitch;
+  void *pixels;
+  SDL_Rect clip_rect;
+  int refcount;
+} SDL_Surface; There are actually more members than this, but they should not be publicly accessed, and so are not shown. The flags member contains a combination of bit flags that describe what type of surface this is. These flags are listed and briefly explained in table 1. Table 1: Surface FlagsFlagMeaningSDL_SWSURFACESurface exists in software (non-video RAM)SDL_HWSURFACESurface exists in video RAM.SDL_ASYNCBLITBlits occur asynchronously.SDL_ANYFORMAT*This flag specifies to use whatever the current display format is for the display surface. Typically, this is used when making a windowed SDL application.SDL_HWPALETTEThe surface makes use of a hardware palette.SDL_DOUBLEBUF*The surface is double buffered (i.e. a flipping chain).SDL_FULLSCREEN*The surface is full screen.SDL_OPENGL*The surface will be used as a destination for OpenGL rendering.SDL_OPENGLBLIT*The surface will be used as a destination for OpenGL rendering.SDL_RESIZABLE*(Windowed mode only) the window is resizable.SDL_HWACCELThe surface will use hardware accelerated blitting.SDL_SRCCOLORKEYThe surface has a color key.SDL_RLEACCELThe surface is used for run-length-encoded blits.SDL_SRCALPHAThe surface has an alpha component.SDL_PREALLOCThe surface came to be from a pre-allocated array of pixel data.*only the display surface may have these flags The format member is a pointer to an SDL_PixelFormat structure that describes the pixel format for this surface. The w and h members describe the width and height of the surface. The pitch contains the number of bytes per scan line for the surface. Video cards being what they are, this value is often not the same as the BytesPerPixel times the width. The pixels is a pointer to pixel data for the surface. It is used to read or write pixels to and from the surface. The clip_rect member is an SDL_Rect that describes the clipping area of the surface. Any writing outside of this area will not be shown. And finally, refcount is a reference count. When a surface is created, it is set to one. You can increment it manually. It is decremented whenever the surface is freed. Once it reaches 0, the surface is deleted from memory. This member is sort of like using AddRef for COM objects. IMPORTANT NOTE: with the exception of refcount and the data pointed to by pixels, these members should not by modified by you directly. There are functions for dealing with and changing most of them. SDL_VideoInfo The last structure we're going to look at is SDL_VideoInfo. As you might expect, it contains information about the video display on the machine it is running on. Here's what it looks like: typedef struct{
+  Uint32 hw_available:1;
+  Uint32 wm_available:1;
+  Uint32 blit_hw:1;
+  Uint32 blit_hw_CC:1;
+  Uint32 blit_hw_A:1;
+  Uint32 blit_sw:1;
+  Uint32 blit_sw_CC:1;
+  Uint32 blit_sw_A:1;
+  Uint32 blit_fill:1;
+  Uint32 video_mem;
+  SDL_PixelFormat *vfmt;
+} SDL_VideoInfo; The closest equivalent in DirectDraw is the DDCAPS structure. SDL_VideoInfo, however, is much easier to read. Most of the members are single bits, and a value of 0 means that the feature in question is not supported, and 1 means that the feature is supported. The hw_available indicates that you may create hardware surfaces, which naturally will be faster than software surface. The wm_available indicates that a window manager is available. In WIN32, one is, but for other platforms, one might not be. The window manager is another subsystem of SDL that deals with some pretty basic settings for a window (if you are using windowed mode versus fullscreen). The blit_hw, blit_hw_CC, and blit_hw_A all deal with the availability of hardware acceleration for blits between surface stored in hardware. The blit_hw bit specifies that generic hardware to hardware blits are accelerated, blit_hw_CC specifies that hardware to hardware colorkeyed blits are accelerated, and blit_hw_A specifies that hardware to hardware alpha blits are accelerated. The blit_sw, blit_sw_CC, and blit_sw_A are much the same as the blit_hw members, except that they specify the capabilities for software to hardware blits instead. The blit_fill member specifies that color fill operations are accelerated. The video_mem contains, in kilobytes, the amount of video RAM for the system. The vfmt member is a pointer to an SDL_PixelFormat. Depending on when you call it, it will contain either the "best" video format (the one with the most capabilities), or the current video format (depending on if you have already set up your display surface or not). Video Information (TGO-02-B) The beautiful thing about SDL is that you don't have to gather any information about the video subsystem before using it if you don't want to. SDL will emulate anything you want. Of course, emulation is slower, but it guarantees that your application will run on any platform that has an SDL implementation. However, if you do want information about the video system, there are a few functions that you can use. The first of these is SDL_GetVideoInfo. SDL_VideoInfo *SDL_GetVideoInfo(void); This function returns a pointer to an SDL_VideoInfo structure. It takes no parameters. DO NOT FREE THE POINTER RETURNED FROM THIS FUNCTION! In order to be effective, you have to call SDL_GetVideoInfo after you have initialized the SDL video subsystem. Typically, initialization of SDL is the first line in the program. The line looks like this: SDL_Init ( SDL_INIT_VIDEO ) ; This single line sets up the video system and the even system (which is another topic altogether). After this call, you can call SDL_GetVideoInfo, and get information about the best pixel format to use for your system, provided you call it before you call SDL_SetVideoMode. Calling SDL_GetVideoInfo after this call, you will get the information about the current display mode. Another thing you can look at, if you really want to, is the name of the video driver (it probably won't help you much, but its something to look at, I guess). You can retrieve it with the SDL_VideoDriverName function. char *SDL_VideoDriverName(char *namebuf, int maxlen); This function takes two parameters, a pointer to a string (namebuf), and an int specifying the maximum length of the string to copy (including the null-terminator). The value returned is the namebuf pointer if this function is successful, and NULL if it fails. It will only fail if you haven't initialized the video subsystem. The name of the video driver isn't particularly useful, but you might want it for some sort of log file for diagnostic purposes. This next call is useful if you are targeting full screen applications. The function is called SDL_ListModes, and it looks like the following. SDL_Rect **SDL_ListModes(SDL_PixelFormat *format, Uint32 flags); This function takes a pointer to an SDL_PixelFormat (or NULL to simply use the value retrieved by SDL_GetVideoInfo ( )->vfmt), and a combination of flags ( the same flags that are value for SDL_Surfaces). It spits out an array of SDL_Rect pointers that describe the various video modes that have the specified format and support the flag specified. If, for example, you need a hardware surface with double buffering, you would call SDL_ListModes in the following manner. SDL_Rect** pModeRects = SDL_ListModes ( NULL , SDL_HWSURFACE |  SDL_DOUBLEBUF ) ; Some special notes about SDL_ListModes. First, it is a NULL terminated list of SDL_Rect* variables. Second, if all video modes accept the flag, this function will return -1 rather than a pointer. Third, if no video modes accept the flag, this function will return NULL. So, this function might be a little cumbersome to use. A different, more directly useful function, SDL_VideoModeOK. int SDL_VideoModeOK(int width, int height, int bpp, Uint32 flags); This function takes the width, height, bits per pixel, and flags for a potential display surface, and determines if the match up of these values is acceptable for the display hardware. Even if they are not, you can still use the same parameters to create your display surface, and SDL will emulate for you. If this function returns 0, then no bpp value will work for the flags specified. If the return value is non-zero, then it represents the nearest bpp that will accept the flags specified. It is best to pick one of the standard mode sizes (640x480, 800x600, 1024x768) when picking mode sizes if you are doing a full screen application. If you aren't, and the video hardware don't support that particular mode, SDL will again emulate it, by placing it on the next larger supported size, and limiting output to a rectangle in the middle of the screen. So, if you went for a 512x384 mode (which is supported on quite a bit of hardware), and the video hardware didn't support it, SDL will throw you into a 640x480 mode, and place all output in the middle 512x384. But enough of examining video capabilities... on to creating surfaces! Creating and Destroying Surfaces (TGO-02-C) Surfaces are the most important part of using SDL's video subsystem. Without them, there'd be nothing to see, and how good is an application you can't see? (Apologies to ZForm, LLC, whose clients can't read this article anyway--they make software for the blind). The first surface you should create in any SDL based application is the display surface. You can create it with the SDL_SetVideoMode function. SDL_Surface *SDL_SetVideoMode(int width, int height, int bpp, Uint32 flags); This function takes a width, height, bits per pixel, and flags, and spits out a pointer to an SDL_Surface. This pointer is to the display surface/primary surface. If you are doing a full-screen application, you will probably want to check out the modes with SDL_ListModes and/or SDL_VideoModeOK, but if you don't that's OK. If you aren't doing a full-screen application, then you should specify 0 for bpp, and have SDL_ANYFORMAT as part of your flags. This makes SDL use the current format of the display, which makes life easier for you. In windowed mode, you can use whatever width and height you like. In WIN32, this will give you a window that has a client area of the size you requested. After calling SDL_SetVideoMode, don't call SDL_FreeSurface on this pointer. SDL cleans up the display surface during SDL_Quit, so you don't have to worry about it. In fact, you don't even have to store this pointer anywhere if you don't want to. You can use SDL_GetVideoSurface (it takes no parameters) to retrieve a pointer to the display surface. Of course, you'll need more than simply a display surface to make your game, unless you plan on making a game with nothing but pixel plotting and filling rectangles. You'll need other surfaces as well. To create a blank surface of a particular size and format, you call SDL_CreateRGBSurface. SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth,
+                                  Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask); To this function, you supply a size (height, width, depth--bpp), and masks for red, green, blue, and alpha, along with some flags, and this function gives you a pointer to a newly created surface that matches your specifications. Typically, you will want to use the same depth and masks as for the display surface, but even if you don't, SDL will be able to copy from one to the other, but it'll be a little slower. The only valid flags for SDL_CreateRGBSurface are SDL_HWSURFACE , SDL_SWSURFACE , SDL_SRCCOLORKEY, and SDL_SRCALPHA. If this function fails, it returns NULL. Another function for creating surfaces is SDL_CreateRGBSurfaceFrom. This function is much the same as SDL_CreateRGBSurface. SDL_Surface *SDL_CreateRGBSurfaceFrom(void *pixels, int width, int height, int depth, int pitch,
+                                      Uint32 Rmask, Uint32 Gmask, Uint32 Bmask, Uint32 Amask); The notable differences are the lack of a flags parameter (the surface exists in system RAM), and the addition of the pixels parameter and the pitch parameter. The pixels parameter is a pointer to pixel data to use for this surface, and pitch is how many bytes exist in each scan line, which does not have to be width times depth. The other parameters are the same as for SDL_CreateRGBSurface. If this function fails, it returns NULL. Something to keep in mind if you are using SDL_CreateRGBSurfaceFrom: the pixels parameter should not be freed until you have freed the surface, since the pixel data you supply to this function is the actual pixel data used by the surface. It does not make a copy. The final function for creating a surface is SDL_LoadBMP. This is a damn handy function. It loads in a standard windows .bmp file onto a surface, and returns the new surface. SDL_Surface *SDL_LoadBMP(const char *file); This function takes a single parameter, a pointer to a string containing the name of the file you wish to load. It returns the newly created surface, or NULL if there is an error. The SDL_LoadBMP function is a godsend. If you've worked with either DirectDraw or GDI, you know how much of a pain it can be to get a stupid bitmap loaded. In SDL, its only a single function call! If that's not reason enough to move to SDL... I don't know what is. There are two more really cool functions that you can use to create surfaces, but they are used more for pixel format conversion rather than creating something in their own right. They take an already existing surface and create a new surface, with the same contents, but a different pixel format. The first of these is SDL_ConvertSurface. SDL_Surface *SDL_ConvertSurface(SDL_Surface *src, SDL_PixelFormat *fmt, Uint32 flags ) ; The parameters are fairly straightforward. You give this function a pointer to a surface that you need converted, a pointer to the format you want it converted to, and a combinatin of flags ( these flag are the same as those used in other surface creation functions). This function creates a surface in the requested format, with the requested flags (if possible), and gives you back a pointer to a new surface. If this function fails, it'll give you NULL. The second of these is SDL_DisplayFormat. SDL_Surface *SDL_DisplayFormat(SDL_Surface *surface); This function takes a surface, and converts it to the display format, so that you can make better use of hardware acceleration, if it exists. It returns a pointer to the newly converted surface, or NULL if it fails. Typically, after calling SDL_ConvertSurface or SDL_DisplayFormat to convert a surface, you will want to destroy the old, pre-converted, surface. Speaking of destroying surfaces, doing so is also quite easy. You simply call SDL_FreeSurface. void SDL_FreeSurface(SDL_Surface *surface); This function takes a pointer to a surface, and returns no values. The surface's refcount member is decremented, and if the refcount reaches 0, then the surface is deleted. Using SDL Video (TGO-02-D) To start with, recall the example we ended with last time (or at least something very close): #include "SDL.h"
+
+enum {
+  SCREENWIDTH = 512,
+  SCREENHEIGHT = 384,
+  SCREENBPP = 0,
+  SCREENFLAGS = SDL_ANYFORMAT
+} ;
+
+int main( int argc, char* argv[] )
+{
+  //initialize systems
+  SDL_Init ( SDL_INIT_VIDEO ) ;
+
+  //set our at exit function
+  atexit ( SDL_Quit ) ;
+
+  //create a window
+  SDL_Surface* pSurface = SDL_SetVideoMode ( SCREENWIDTH , SCREENHEIGHT ,
+                                         	SCREENBPP , SCREENFLAGS ) ;
+
+  //declare event variable
+  SDL_Event event ;
+
+  //message pump
+  for ( ; ; )
+  {
+    //look for an event
+    if ( SDL_PollEvent ( &event ) )
+    {
+      //an event was found
+      if ( event.type == SDL_QUIT ) break ;
+    }
+  }//end of message pump
+
+  //done
+  return ( 0 ) ;
+} This is our basic shell application for SDL, and during this TGO, we will build on it. As you can see, I already have initialized SDL's video subsystem with my call to SDL_Init, and I have already set the video mode (it is currently set up for windowed mode and uses the current display format). This application doesn't do a whole lot, other than give you a blank, black window with a border around it. You can't resize the window, but you can move it around. This program simply waits for you to quit. However, I will point out that the equivalent application in GDI or DirectDraw would be about five times as many lines as we have here. Now we've got to make the application actually DO something. Let's get to work. Rectangular Fills Often, you will need a large rectangular area of a surface cleared out to a particular color. The rectangular area can be as small as a single pixel, or as large as the entire screen. The function for doing this is SDL_FillRect. int SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, Uint32 color); This function takes three parameters: a pointer to the destination surface, a pointer to an SDL_Rect that describes the rectangle you wish to fill, and a color (in the native pixel format of the surface). If you want to clear out the entire surface, you can use NULL for the dstrect parameter. The surface we've got, and an SDL_Rect is easy enough to fill out. One thing we need before we can use this function is the ability to convert from a device independent color (i.e. an SDL_Color variable) into the native pixel format (and I don't want to use the code we looked at for this purpose earlier). Luckily, SDL has such a function. It is called SDL_MapRGB. Uint32 SDL_MapRGB(SDL_PixelFormat *fmt, Uint8 r, Uint8 g, Uint8 b); This function takes a pointer to an SDL_PixelFormat structure, and a red, green, and blue component from 0-255, and it figures out what value works for a native pixel of that same color (or the nearest equivalent). So, let us say we want to fill the screen with pure red. This is how we'd go about it: SDL_FillRect ( pSurface , NULL , SDL_MapRGB ( pSurface->format , 255 , 0 , 0 ) ) ; But we're still not done. SDL's video system doesn't automatically display any of the changes to the surface. In order to make the new data visible, we have to update the rectangle. The function for doing this is SDL_UpdateRect. void SDL_UpdateRect(SDL_Surface *screen, Sint32 x, Sint32 y, Sint32 w, Sint32 h); This function takes four parameters: the pointer to the surface, and an x , y, w, and h values describing the rectangle to update. If you wish to update the entire surface, you can place 0 into each of x, y, w, and h, like so: SDL_UpdateRect ( pSurface , 0 , 0 , 0 , 0 ) ; So, let's do a quick example. Start a new project named SDLRandomFillRect (or whatever you want to call it), set it up for SDL, and put the following code into main.cpp: #include "SDL.h"
+#include <stdlib.h>
+
+enum {
+  SCREENWIDTH = 512,
+  SCREENHEIGHT = 384,
+  SCREENBPP = 0,
+  SCREENFLAGS = SDL_ANYFORMAT
+} ;
+
+int main( int argc, char* argv[] )
+{
+  //initialize systems
+  SDL_Init ( SDL_INIT_VIDEO ) ;
+
+  //set our at exit function
+  atexit ( SDL_Quit ) ;
+
+  //create a window
+  SDL_Surface* pSurface = SDL_SetVideoMode ( SCREENWIDTH , SCREENHEIGHT ,
+                                         	SCREENBPP , SCREENFLAGS ) ;
+
+  //declare event variable
+  SDL_Event event ;
+
+  //message pump
+  for ( ; ; )
+  {
+    //look for an event
+    if ( SDL_PollEvent ( &event ) )
+    {
+      //an event was found
+      if ( event.type == SDL_QUIT ) break ;
+    }
+
+    //set up random rectangle
+    SDL_Rect rect ;
+    rect.x = rand ( ) % ( SCREENWIDTH ) ;
+    rect.y = rand ( ) % ( SCREENHEIGHT ) ;
+    rect.w = rand ( ) % ( SCREENWIDTH - rect.x ) ;
+    rect.h = rand ( ) % ( SCREENHEIGHT - rect.y ) ;
+
+    //fill the rectangle
+    SDL_FillRect ( pSurface , &rect ,
+               	SDL_MapRGB ( pSurface->format , rand ( ) % 256 ,
+                                rand ( ) % 256 , rand ( ) % 256 ) ) ;
+
+    //update the screen
+    SDL_UpdateRect ( pSurface , 0 , 0 , 0 , 0 ) ;
+  }//end of message pump
+
+  //done
+  return ( 0 ) ;
+} The lines in bold are new to this example (as opposed to the base shell code), if you just want to add those. Most of the lines are fairly obvious. Five of them deal with setting up the SDL_Rect variable, another does the filled rectangle, and yet another updates the display. On my display, this example runs really fast, but I've got a good video card and that's to be expected. Its output looks something like Figure 1. Figure 1: Random FillRect Example Program Filling rectangular areas in SDL is a lot simpler than the equivalent GDI or DirectDraw code (no HBRUSH to make, no DDBLTFX structure to fill out). Just give it a rectangle, a format, and color, and you've drawn yourself a rectangle. Pixel Plotting In theory, you could draw pixels using SDL_FillRect, and just use a w and h of 1. That, of course, is not how the SDL_FillRect function is intended to be used, but the SDL Police won't come and stop you, and it *IS* a completely cross platform method of drawing pixels, whereas doing pixel plotting with direct memory access can have portability issues, as we shall see in a moment. In DirectDraw, in order to start writing to the memory of a surface itself, you need to Lock the surface and Unlock it when you are done. The same is true for SDL, in general. Some surfaces never need to be locked, typically those that dwell in system memory. How do you tell? SDL provides a macro for you called SDL_MUSTLOCK. To test a surface, you do the following: if ( SDL_MUSTLOCK ( pSurface ) )
+{
+//surface must be locked for access
+}
+else
+{
+//no need to lock surface
+} If you don't need to lock a surface, you will typically do nothing special, and so the entire else clause above won't be there. In order to lock a surface, you call SDL_LockSurface. In order to unlock a surface, you call SDL_UnlockSurface. I doubt either function name comes as a big surprise to you. The same sort of caveats exist for SDL locks as for DirectDraw locks. Don't lock a surface longer than you have to, and don't call any system functions while a surface is locked. Treat the locked surface time as a critical section of your code's execution. Here are the prototypes for SDL_LockSurface and SDL_UnlockSurface. int SDL_LockSurface(SDL_Surface *surface);
+void SDL_UnlockSurface(SDL_Surface *surface); Each of these have only one parameter... the pointer to the surface you intend to lock. In the case of SDL_LockSurface, there is a return value. If all goes well, this return value will be 0. If there is some sort of problem, you will get -1 instead. Something important to point out here. You can lock a surface more than once prior to unlocking it. If you do this, you need to have as many unlock calls as you have lock calls, like so: SDL_LockSurface ( pSurface ) ;    //first lock
+SDL_LockSurface ( pSurface ) ;    //second lock
+SDL_UnlockSurface ( pSurface ) ;  //first unlock... surface is still locked
+SDL_UnlockSurface ( pSurface ) ;  //second unlock... surface is now unlocked This is just something to be aware of. Generally speaking, if you have a large operation that requires some sort of direct access to the pixels of a surface, do a lock, do the operation, and do the unlock. If you have an even larger operation that relies on other operations that lock and unlock the surface, that's ok, because locking and unlocking is recursive. Once the surface is locked, you can begin to directly access the pixel data through the SDL_Surface's pixels member. This includes working with the pixel format of the surface as well as the pitch member of the surface. When setting pixels, I personally like to work with a pixel format independent representation of the color, i.e the SDL_Color structure, or something very much like it. I like having red, green, and blue all represented by numbers between 0 and 255. Unfortunately, an SDL_Surface can have a variety of different formats, and so we'll need to convert from an SDL_Color structure into the native format using SDL_MapRGB. No big deal. From there, next need to know where exactly to write to. The pixels member of SDL_Surface is a void*. I personally like to convert it to a char*, and work the on the surface as though it were like a character buffer. The offset from the beginning of the pixels pointer depends on the x and y coordinates of the pixel you wish to set. For every value in y, you increase by the contents of the SDL_Surface's pitch member. For every value in x, you increase by the contents of the SDL_Surface's pixel format's BytesPerPixel member. Calculating the position looks something like the following. //point to beginning of buffer
+char* pPosition = ( char * ) pSurface->pixels ;
+
+//increment y
+pPosition += ( y * pSurface->pitch ) ;
+
+//increment x
+pPosition += ( x * pSurface->format->BytesPerPixel ) ;
+
+//pPosition now points to the proper pixel We've got the proper position, and we've got the proper color. The only thing left is to copy the data from the color over into the buffer. This is where we meet a very small portability issue. On WIN32 ( and many other operating systems), we can simply do the following code to copy the pixel data from the color variable into the buffer: memcpy ( pPosition , &color , pSurface->format->BytesPerPixel ) ; And this will work, no problem, on most of the machines that the program is likely ever to be compiled for. But then there are the oddballs. The code above relies on the fact that the target machine is little endian. On a big endian system, unless using a 32 bpp surface, you are going to get garbled colors, or black. The solution? Well, I have one in mind, but I haven't had a chance to test it out yet ( since I don't have a machine that supports SDL but has a big endian). The basic idea is that you want to reverse the order of the bytes in the color variable if the machine is big endian, and then do the writing. There are a few macros and functions in SDL that can assist with this. So, here's a basic putpixel function. This function assumes that the surface has already been locked, or does not need locking. void SetPixel ( SDL_Surface* pSurface , int x , int y , SDL_Color color ) 
+{
+  //convert color
+  Uint32 col = SDL_MapRGB ( pSurface->format , color.r , color.g , color.b ) ;
+
+  //determine position
+  char* pPosition = ( char* ) pSurface->pixels ;
+
+  //offset by y
+  pPosition += ( pSurface->pitch * y ) ;
+
+  //offset by x
+  pPosition += ( pSurface->format->BytesPerPixel * x ) ;
+
+  //copy pixel data
+  memcpy ( pPosition , &col , pSurface->format->BytesPerPixel ) ;
+} To retrieve a pixel, we can recycle much of our pixel setting code, because the task is simply reversed. We determine the position in the exact same way, we memcpy it into a Uint32 variable (with the same minor caveat about big endians), and then convert it to an SDL_Color variable. The function for doing that is SDL_GetRGB. void SDL_GetRGB(Uint32 pixel, SDL_PixelFormat *fmt, Uint8 *r, Uint8 *g, Uint8 *b); This function is much the same as SDL_MapRGB, except that this time, we send pointers to Uint8s into which are placed the various color components corresponding to the native pixel color. So, if we have a Uint32 variable called col, and an SDL_Color variable called color, this is how we would convert it. SDL_GetRGB ( col , pSurface->format , &color.r , &color.g , &color.b ) ; And with that, we can make a GetPixel function. SDL_Color GetPixel ( SDL_Surface* pSurface , int x , int y ) 
+{
+  SDL_Color color ;
+  Uint32 col = 0 ;
+
+  //determine position
+  char* pPosition = ( char* ) pSurface->pixels ;
+
+  //offset by y
+  pPosition += ( pSurface->pitch * y ) ;
+
+  //offset by x
+  pPosition += ( pSurface->format->BytesPerPixel * x ) ;
+
+  //copy pixel data
+  memcpy ( &col , pPosition , pSurface->format->BytesPerPixel ) ;
+
+  //convert color
+  SDL_GetRGB ( col , pSurface->format , &color.r , &color.g , &color.b ) ;
+  return ( color ) ;
+} And now time for another example. Create a project, and call it something like SDLRandomPixels. Place the following code into main.cpp. #include "SDL.h"
+#include <stdlib.h>
+#include <memory.h>
+
+enum {
+  SCREENWIDTH = 512,
+  SCREENHEIGHT = 384,
+  SCREENBPP = 0,
+  SCREENFLAGS = SDL_ANYFORMAT
+} ;
+
+void SetPixel ( SDL_Surface* pSurface , int x , int y , SDL_Color color ) ;
+SDL_Color GetPixel ( SDL_Surface* pSurface , int x , int y ) ;
+int main( int argc, char* argv[] )
+{
+  //initialize systems
+  SDL_Init ( SDL_INIT_VIDEO ) ;
+
+  //set our at exit function
+  atexit ( SDL_Quit ) ;
+
+  //create a window
+  SDL_Surface* pSurface = SDL_SetVideoMode ( SCREENWIDTH , SCREENHEIGHT ,
+                                         	SCREENBPP , SCREENFLAGS ) ;
+
+  //declare event variable
+  SDL_Event event ;
+
+  //message pump
+  for ( ; ; )
+  {
+    //look for an event
+    if ( SDL_PollEvent ( &event ) )
+    {
+      //an event was found
+      if ( event.type == SDL_QUIT ) break ;
+    }
+
+    //pick a random color
+    SDL_Color color ;
+    color.r = rand ( ) % 256 ;
+    color.g = rand ( ) % 256 ;
+    color.b = rand ( ) % 256 ;
+
+    //lock the surface
+    SDL_LockSurface ( pSurface ) ;
+
+    //plot pixel at random location
+    SetPixel ( pSurface , rand ( ) % SCREENWIDTH , rand ( ) % SCREENHEIGHT , color ) ;
+
+    //unlock surface
+    SDL_UnlockSurface ( pSurface ) ;
+
+    //update surface
+    SDL_UpdateRect ( pSurface , 0 , 0 , 0 , 0 ) ;
+  }//end of message pump
+
+  //done
+  return ( 0 ) ;
+}
+void SetPixel ( SDL_Surface* pSurface , int x , int y , SDL_Color color ) 
+{
+  //convert color
+  Uint32 col = SDL_MapRGB ( pSurface->format , color.r , color.g , color.b ) ;
+
+  //determine position
+  char* pPosition = ( char* ) pSurface->pixels ;
+
+  //offset by y
+  pPosition += ( pSurface->pitch * y ) ;
+
+  //offset by x
+  pPosition += ( pSurface->format->BytesPerPixel * x ) ;
+
+  //copy pixel data
+  memcpy ( pPosition , &col , pSurface->format->BytesPerPixel ) ;
+}
+SDL_Color GetPixel ( SDL_Surface* pSurface , int x , int y ) 
+{
+  SDL_Color color ;
+  Uint32 col = 0 ;
+
+  //determine position
+  char* pPosition = ( char* ) pSurface->pixels ;
+
+  //offset by y
+  pPosition += ( pSurface->pitch * y ) ;
+
+  //offset by x
+  pPosition += ( pSurface->format->BytesPerPixel * x ) ;
+
+  //copy pixel data
+  memcpy ( &col , pPosition , pSurface->format->BytesPerPixel ) ;
+
+  //convert color
+  SDL_GetRGB ( col , pSurface->format , &color.r , &color.g , &color.b ) ;
+  return ( color ) ;
+} Again, the code in bold is the code that has been added to the basic shell application. This example starts placing dots of random colors onto the window. When it runs, it looks somewhat like figure 2. Figure 2: Random Pixels Demo Once you can plot a pixel, you can do just about anything, including drawing lines, circles, rectangular frames, and so on. Doing all of that stuff is naturally beyond the scope of this article. I get you as far as plotting pixels. Blitting The primary use of SDL_Surfaces is not to fill rectangles nor to plot pixels. The main task is to copy rectangular sections from one surface to another, much like GDI's BitBlt function and DirectDraw's Blt or BltFast function. The function for doing that is SDL_BlitSurface. int SDL_BlitSurface(SDL_Surface *src, SDL_Rect *srcrect, SDL_Surface *dst, SDL_Rect *dstrect); This function takes four parameters, the source surface, a source rectangle, a destination surface, and a destination rectangle. It returns 0 if everything is OK, and -1 if there was a problem. If the pointers to either rectangle are NULL, then the entire surface is assumed to be the source or destination area. Naturally, you need two surfaces in order to perform a blit, although you can use the same for both source and destination, at least in theory. The documentation warns that you should not call SDL_BlitSurface on a surface that is locked. So, time (already) for another quick example: the Amazing Bouncing Ball Demo of Death™! Start yourself a new project, name it SDLBouncingBall or something just as clever, and place the following code into main.cpp. Also, make a small bitmap that is 32x32 pixels in size, draw a circle in it, and save it as ball.bmp. #include "SDL.h"
+
+enum {
+  SCREENWIDTH = 512,
+  SCREENHEIGHT = 384,
+  SCREENBPP = 0,
+  SCREENFLAGS = SDL_ANYFORMAT
+} ;
+
+int main( int argc, char* argv[] )
+{
+  //initialize systems
+  SDL_Init ( SDL_INIT_VIDEO ) ;
+
+  //set our at exit function
+  atexit ( SDL_Quit ) ;
+
+  //create a window
+  SDL_Surface* pSurface = SDL_SetVideoMode ( SCREENWIDTH , SCREENHEIGHT ,
+                                         	SCREENBPP , SCREENFLAGS ) ;
+  //load bitmap
+  SDL_Surface* pBitmap = SDL_LoadBMP ( "ball.bmp" ) ;
+
+  //source and destination rectangles
+  SDL_Rect rcSrc , rcDst ;
+  rcSrc.w = pBitmap->w ;
+  rcSrc.h = pBitmap->h ;
+  rcSrc.x = 0 ;
+  rcSrc.y = 0 ;
+  rcDst = rcSrc ;
+
+  //movement rate
+  int dx = 2 , dy = 2 ;
+
+  //declare event variable
+  SDL_Event event ;
+
+  //message pump
+  for ( ; ; )
+  {
+    //look for an event
+    if ( SDL_PollEvent ( &event ) )
+    {
+      //an event was found
+      if ( event.type == SDL_QUIT ) break ;
+    }
+    //clear the screen
+    SDL_FillRect ( pSurface , NULL , 0 ) ;
+
+    //place the ball
+    SDL_BlitSurface ( pBitmap , &rcSrc , pSurface , &rcDst ) ;
+
+    //move the ball
+    rcDst.x += dx ;
+    rcDst.y += dy ;
+
+    //check for bounces
+    if ( rcDst.x == 0 || rcDst.x == SCREENWIDTH - rcDst.w ) dx = -dx ;
+    if ( rcDst.y == 0 || rcDst.y == SCREENHEIGHT - rcDst.h ) dy = -dy ;
+
+    //update the screen
+    SDL_UpdateRect ( pSurface , 0 , 0 , 0 , 0 ) ;
+  }//end of message pump
+
+  //done
+  return ( 0 ) ;
+} And if you run the application, you'll see whatever image you made for your ball bounce slowly around the window. Its not a particularly mind-boggling example, but it does adequately demonstrate SDL_BlitSurface. Plus it's hypnotic.... you are getting sleepy... sleeeeeepy.... Anyway. That's the simple blit demo. As we go along, this stuff just keeps getting easier. Figure 3 shows what this program looks like. Figure 3: Bouncing Ball Demo Just a quick note before we move on. When using the SDL_BlitSurface function, the contents of the SDL_Rect pointed to by dstrect can change if the destination rectangle is clipped, so often it is a good idea to make a copy of the destination rectangle prior to blitting, unless you absolutely know that the destination rectangle lies entirely withing the destination surface. Color Keys And now we come to the issue of transparency. In GDI, in order to make transparency work, you either need to use bitmasks, or else use the TransparentBlt function, which doesn't work on all versions of Windows. In DirectDraw, you have to set up a DDCOLORKEY for a surface that uses one, and you have to pass particular flags when using the Blt or BltFast function. In SDL, setting up a transparent color is really easy. Unlike DirectDraw, you can only have one (1) transparent color for an SDL surface (of course, it's not like DirectDraw had widespread support for transparent color spaces, but I digress). In any case, a single color is usually enough for transparency anyway. Once a color key has been set for a surface, it is used whenever that surface is the source surface in a blit operation (which is nice, because then you don't have to remember which surfaces have color keys). The function for setting the color key of a surface is called SDL_SetColorKey. int SDL_SetColorKey(SDL_Surface *surface, Uint32 flag, Uint32 key); This function takes three parameters: a pointer to a surface, a flag, and a key (the color, in the surfaces native pixel format). It returns an int, 0 if successful, and -1 if there is an error. If flag contiains SDL_SRCCOLORKEY, then the value in key becomes the new transparent color key. If flag contains 0, any color key is cleared. You can retrieve the color key from the surface's pixel format, e.g. pSurface->format->colorkey. Remember that key is in the native pixel format of the surface, and so if working with SDL_Color variables, you'll need to convert it with SDL_MapRGB. No example for color keys, as their use is fairly obvious. Clipping Rectangles As a final topic, I'm going to show you how to set up a clipping rectangle for a surface. A clipping rectangle is the equivalent of an HRGN selected into an HDC in GDI, or an IDirectDrawClipper object attached to an IDirectDrawSurface object with SetClipper. Compared to their GDI or DirectDraw counterparts, the SDL clipping rectangle is not nearly as powerful or flexible. You can only have a single clipping rectangle at a time. For most purposes, that's enough. For times when it is not, you'll just have to get creative. A clipping rectangle is just that: a rectangular area ( as described by an SDL_Rect variable) to which all destination blits are confined. Pixel plotting is unaffected by the clipping rectangle, as it directly accesses the pixel data of the surface. To set up a clipping rectangle for a surface, the function is SDL_SetClipRect. void SDL_SetClipRect(SDL_Surface *surface, SDL_Rect *rect); This function returns no value. It takes two parameters, a pointer to a surface (for which you are setting the clipping rectangle), and a pointer to an SDL_Rect structure (which contains the new clipping rectangle). If you pass NULL for rect, you will set the clipping area to the size of the entire surface. To examine the contents of the clipping rectangle, you can either look at the clip_rect member of the SDL_Surface structure, or you can use SDL_GetClipRect, which has the same parameter list as SDL_SetClipRect, except that the current clipping rectangle is instead read into the variable pointed to by rect. No example for clipping rectangles, as their use is fairly obvious. Summary We haven't totally exhausted the video system of SDL yet. There is still quite a bit more, but you've now been exposed to the basics. The functions shown in this article will be the ones most oft-used, although there are certainly some interesting aspects of some of the other functions, and later in the series, we shall return once again to the video subsystem. For now, this shall suffice. Next Time: Events Ernest S. Pazera ernestpazera@hotmail.com Sources: SDL Documentation Comments Gaiiden Jun 28 2011 03:08 AM Table code (bold headers): <table border="1" cellpadding="3" cellspacing="0" width="590"><tbody><tr><td colspan="2" class="tblhdr">Table 1: Surface Flags</td></tr><tr valign="top"><td class="tblhdr" width="30%">Flag</td><td class="tblhdr" width="70%">Meaning</td></tr><tr valign="top"><td>SDL_SWSURFACE</td><td>Surface exists in software (non-video RAM)</td></tr><tr><td>SDL_HWSURFACE</td><td>Surface exists in video RAM.</td></tr><tr><td>SDL_ASYNCBLIT</td><td>Blits occur asynchronously.</td></tr><tr><td>SDL_ANYFORMAT*</td><td>This flag specifies to use whatever the current display format is for the display surface. Typically, this is used when making a windowed SDL application.</td></tr><tr><td>SDL_HWPALETTE</td><td>The surface makes use of a hardware palette.</td></tr><tr><td>SDL_DOUBLEBUF*</td><td>The surface is double buffered (i.e. a flipping chain).</td></tr><tr><td>SDL_FULLSCREEN*</td><td>The surface is full screen.</td></tr><tr><td>SDL_OPENGL*</td><td>The surface will be used as a destination for OpenGL rendering.</td></tr><tr><td>SDL_OPENGLBLIT*</td><td>The surface will be used as a destination for OpenGL rendering.</td></tr><tr><td>SDL_RESIZABLE*</td><td>(Windowed mode only) the window is resizable.</td></tr><tr><td>SDL_HWACCEL</td><td>The surface will use hardware accelerated blitting.</td></tr><tr><td>SDL_SRCCOLORKEY</td><td>The surface has a color key.</td></tr><tr><td>SDL_RLEACCEL</td><td>The surface is used for run-length-encoded blits.</td></tr><tr><td>SDL_SRCALPHA</td><td>The surface has an alpha component.</td></tr><tr><td>SDL_PREALLOC</td><td>The surface came to be from a pre-allocated array of pixel data.</td></tr></tbody></table> Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » APIs and Tools » Article: The Simple DirectMedia Layer from a WIN32 Perspective, Part 2: SDL Video English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

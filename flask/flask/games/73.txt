@@ -1,0 +1,419 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: SDL & Fonts Part 2: PrintStrings Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This SDL & Fonts The Simple DirectMedia Layer from a WIN32 Perspective, Part 2: SDL Video Using an RTF Log File Game Programming: Snake Game Programming Genesis Part III : Tracking Your Window and Using GDI Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike SDL & Fonts Part 2: PrintStrings By Doug Manley | Published Jul 09 2003 05:52 PM in Game Programming null int stext clrbg str font text height Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download the source code for this article here. Prerequisites Really, all you need is to understand that we're rendering text in this example. If you want to have the code working, you'll need SDL, SDL_TTF, and a compiler :-) A special thank-you to Ernest Pazera for all his friendly input. SDL_TTF The reason why I wrote SDL & Fonts was because I found SDL_TTF very confusing to use. I talked to Sam about it, and he gave me some help, but I know that reading an article is much nicer than cursing at .C files, looking for some help (from experience). Last time, on GameDev... Last time, we set up SDL_TTF and wrote a few functions to make SDL a little easier. Still, rendering text is a mess. To address this (and because SDL_TTF doesn't like the '\n' character), we'll be making PrintStrings() today. PrintStrings() Okay, let's recap on how to draw some text: 
+
+// Step 1: Load a font and give it a point-size:
+
+TTF_Font fntArial12 = TTF_OpenFont( "arial.ttf", 12 );
+
+// Step 2: Render to an SDL_Surface:
+
+SDL_Color clrBlack = { 0,0,0, 0 };
+
+// (or use newSDL_Color( 0,0,0 );)
+
+SDL_Surface *sText =
+
+  TTF_RenderText_Solid( fntArial12, "Hello.", clrBlack );
+
+// Step 3: Blit that to the screen:
+
+SDL_Rect rcDest = { 20,50, 0,0 };
+
+// (or use newSDL_Rect( 20,50, 0,0 );)
+
+SDL_BlitSurface( sText,NULL, screen,&rcDest );
+
+ So, PrintStrings() should do something like that. So, for our first version of PrintStrings, we'd need to pass it a destination, a font, the text, where to draw it, and a color. Also, I'm using "standard strings" (std::string) for the text so that we can do some convenient operations on the text. 
+
+void PrintStrings( SDL_Surface *sDest, TTF_Font *fnt, String str,
+
+                   SDL_Rect &rc, SDL_Color clr ) {
+
+  SDL_Surface *sText = TTF_RenderText_Solid( fnt, str.c_str(), clr );
+
+  SDL_BlitSurface( sText,NULL, sDest,&rc );
+
+  SDL_FreeSurface( sText );
+
+}
+
+ Right now, all that does is save about 2 lines of code. But if we want to do multiple lines, it'll save a lot more than that. To this effect, SDL_TTF provides a nice function called TTF_FontLineSkip(). If you don't use this function for determining spacing and blit the lines one under the other, the text may be spaced really far apart. It sort of looks like double-spacing on some fonts (some fonts don't have this problem at all). So, if you draw a line at (0,20), you should draw the next line at (0,20+TTF_FontLineSkip(fnt)). That makes the text look normal. With that in mind, let's make another PrintStrings() that can handle multiple lines. Let's also add another color for the background. 
+
+void PrintStrings( SDL_Surface *sDest, TTF_Font *fnt, String str,
+
+                   SDL_Rect &rc, SDL_Color clrFg, SDL_Color clrBg ) {
+
+  int lineSkip = TTF_FontLineSkip( font );  // Get the line-skip value.
+
+  int width = 0, height = 10;
+
+  std::vector<String> vLines; // these are the individual lines.
+
+  
+
+  // Break the String into its lines:
+
+  int n = 0;
+
+  while( n != -1 ) {
+
+    // Get until either '\n' or '\0':
+
+    String strSub;
+
+    n = str.find( '\n', 0 ); // Find the next '\n'
+
+    strSub = str.substr( 0,n );
+
+    if( n != -1 ) {
+
+      str = str.substr( n+1, -1 );
+
+    }
+
+    vLines.push_back(strSub);
+
+    
+
+    // Get the size of the rendered text:
+
+    int w = 0;
+
+    TTF_SizeText( font, strSub.c_str(), &w,&height );
+
+    if( w > width ) {  width = w;  }
+
+    // (really, we just want to see how wide this is going to be)
+
+  }
+
+
+
+  // Since the width was determined earlier, get the height:
+
+  // (vLines.size() == Number of Lines)
+
+  height = (vLines.size()-1) * lineSkip + height; // plus the first line
+
+  // (we assume that height is the same for all lines.)
+
+
+
+  // Make the surface to which to blit the text:
+
+  sText = SDL_CreateRGBSurface( SDL_SWSURFACE, width,height, 
+
+      sDest->format->BitsPerPixel, 
+
+      sDest->format->Rmask,
+
+      sDest->format->Gmask,
+
+      sDest->format->Bmask,
+
+      sDest->format->Amask
+
+  );
+
+  // (it's compatible with the destination Surface
+
+
+
+  // Now, fill it with the background color:
+
+  SDL_FillRect( sText,NULL, clrBg );
+
+
+
+  // Actually render the text:
+
+  SDL_Surface *sTemp = NULL;
+
+  for( int i = 0; i < vLines.size(); i++ ) {
+
+    // The rendered text:
+
+    sTemp = TTF_RenderText_Solid( font, vLines[i].c_str(), clrFg );
+
+    
+
+    // Put it on the surface (sText):
+
+    SDL_BlitSurface( sTemp,NULL,
+
+      sText,&(SDL_Rect)newSDL_Rect(0,i*lineSkip,0,0) );
+
+  // Clean up:
+
+  SDL_FreeSurface( sTemp );
+
+  }
+
+  // So, now we have a nice bitmap (sText) that has all the text on it.
+
+
+
+  // Draw the text on the destination:
+
+  SDL_BlitSurface( sText,NULL, dest,&rc );
+
+  SDL_FreeSurface( sText );
+
+}
+
+ That's a lot longer, and it saves you a lot of time to call PrintStrings() instead of manually printing each line. This is a medium-strength version of PrintStrings(). The one that I use has one extra parameter: "int flags." You can OR a bunch of parameters to PrintStrings() this way. One of them doesn't draw to the destination; it returns the surface instead. Another aligns the text (like left, centered, right). Another draws transparently. I've copied the almost-full-power version here (I haven't needed some things implemented yet, so they're still un-coded): 
+
+const int PS_ALIGN_LEFT =  1;
+
+const int PS_ALIGN_CENTER =  2;
+
+const int PS_ALIGN_RIGHT =  4;
+
+const int PS_CREATE_SURFACE =  8;
+
+const int PS_TRANSPARENT_BG =  16;
+
+const int PS_BLENDED =    32;
+
+SDL_Surface* PrintStrings( SDL_Surface *dest, TTF_Font *font,
+
+                           String str, SDL_Rect &rc, SDL_Color clrFg,
+
+                           SDL_Color clrBg, int flags ) {
+
+/* This function prints "str" with font "font" and color "clrFg"
+
+ * onto a rectangle of color "clrBg".
+
+ * It does not pad the text.
+
+ * If CREATE_SURFACE is NOT passed, the function returns NULL,
+
+ *otherwise, it returns an SDL_Surface * pointer.
+
+ */
+
+  // If there's nothing to draw, return NULL:
+
+  if( str.length() == 0 || font == NULL ) {
+
+    return( NULL );
+
+  }
+
+
+
+  // This is the surface that everything is printed to.
+
+  SDL_Surface *sText = NULL;
+
+  int lineSkip = TTF_FontLineSkip( font );
+
+  int width = 10, height = 10;
+
+  std::vector<String> vLines;
+
+  
+
+  // Break the String into its lines:
+
+  int n = 0;
+
+  while( n != -1 ) {
+
+    // Get until either "\n" or "\0":
+
+    String strSub;
+
+    n = str.find( '\n', 0 );
+
+    strSub = str.substr( 0,n );
+
+    if( n != -1 ) {
+
+      str = str.substr( n+1, -1 );
+
+    }
+
+    vLines.push_back(strSub);
+
+    
+
+    int w = 0;
+
+    // Get the size of the rendered text.
+
+    TTF_SizeText( font, strSub.c_str(), &w,&height );
+
+    if( w > width ) {  width = w;  }
+
+  }
+
+  
+
+  // vLines.size() == Number of Lines.
+
+  // we assume that height is the same for all lines.
+
+  height = (vLines.size()-1) * lineSkip + height;
+
+  
+
+  // dest CAN'T be NULL if you're creating the surface!
+
+  if( dest != NULL && (flags&PS_CREATE_SURFACE) ) {
+
+    printf("dest != NULL with PS_CREATE_SURFACE!\n");
+
+    return(NULL);
+
+  }
+
+  if( dest == NULL ) {
+
+    if( flags&PS_CREATE_SURFACE ) {
+
+      // Create a "dest" to which to print:
+
+      dest = SDL_CreateRGBSurface( SDL_SWSURFACE, width,
+
+          height, BPP, 0,0,0,0 );
+
+    } else {
+
+      printf("There was no surface.\n(Exiting function...)\n");
+
+      return(NULL);
+
+    }
+
+  }
+
+  
+
+  sText = SDL_CreateRGBSurface( SDL_SWSURFACE, width,height,
+
+    dest->format->BitsPerPixel, dest->format->Rmask,dest->format->Gmask,
+
+    dest->format->Bmask,dest->format->Amask );
+
+
+
+  // Color in the rectangle on the destination:
+
+  if( flags&PS_TRANSPARENT_BG ) {
+
+    // If the fg & bg colors are the same, we need to fix it:
+
+    if( clrFg == clrBg ) {
+
+      if( clrFg == BLACK ) {
+
+        clrBg = WHITE;
+
+      } else {
+
+        clrBg = BLACK;
+
+      }
+
+    }
+
+    SDL_FillRect( sText,NULL,
+
+      SDL_MapRGB(sText->format,clrBg.r,clrBg.g,clrBg.b) );
+
+    SDL_SetColorKey( sText, SDL_SRCCOLORKEY|SDL_RLEACCEL,
+
+         SDL_MapRGB(sText->format,clrBg.r,clrBg.g,clrBg.b) );
+
+  } else {
+
+    SDL_FillRect( sText,NULL, clrBg );
+
+  }
+
+  
+
+  // Actually render the text:
+
+  SDL_Surface *sTemp = NULL;
+
+  for( int i = 0; i < vLines.size(); i++ ) {
+
+    // The rendered text:
+
+    if( flags & PS_BLENDED ) {
+
+      sTemp = TTF_RenderText_Blended( font, vLines[i].c_str(), clrFg );
+
+    } else {
+
+      sTemp = TTF_RenderText_Solid( font, vLines[i].c_str(), clrFg );
+
+    }
+
+    
+
+    // Put it on the surface:
+
+    if( (flags&PS_ALIGN_LEFT) ||
+
+         !(flags&PS_ALIGN_CENTER ||
+
+         flags&PS_ALIGN_RIGHT) ) {
+
+      // If it's specifically LEFT or none of the others:
+
+      SDL_BlitSurface( sTemp,NULL, sText,
+
+          &(SDL_Rect)newSDL_Rect(0,i*lineSkip,0,0) );
+
+    }
+
+    if( flags & PS_ALIGN_CENTER ) {
+
+      int w = 0, h = 0; TTF_SizeText( font, vLines[i].c_str(), &w,&h );
+
+      SDL_BlitSurface( sTemp,NULL, sText,
+
+          &(SDL_Rect)newSDL_Rect(width/2-w/2,i*lineSkip,0,0) );
+
+    }
+
+    if( flags & PS_ALIGN_RIGHT ) {
+
+      printf("ERROR: PrintStrings()::PS_ALIGN_RIGHT:"
+
+          "Oops, this hasn't been implemented yet\n");
+
+    }
+
+    // Clean up:
+
+    SDL_FreeSurface( sTemp );
+
+  }
+
+  
+
+  if( flags & PS_CREATE_SURFACE ) {
+
+    SDL_FreeSurface( dest );
+
+    return( sText );
+
+  }
+
+  
+
+  // Draw the text on top of that:
+
+  SDL_BlitSurface( sText,NULL, dest,&rc );
+
+  SDL_FreeSurface( sText );
+
+  return(NULL);
+
+}
+
+ Closing Thanks for your support, and if you need anything, feel free to e-mail me at ssvegeta7@yahoo.com. Next Time Possible topics: GetString(), RenderClass, SuperTimer. Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: SDL & Fonts Part 2: PrintStrings English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

@@ -1,0 +1,343 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Building an .X File Frame Hierarchy Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This How to parse .X files Procedural Planets Part 1 - Structure Animating Characters with DirectX Skinned Mesh Animation Using Matrices Object-Oriented Scene Management Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 1 Like 0Likes Dislike Building an .X File Frame Hierarchy By Jim Adams | Published Sep 24 2001 09:17 AM in Game Programming frame templates null template parent child file hierarchy name Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Building an .X File Frame Hierarchy by Jim Adams Copyright © 2001 by Jim Adams. All Rights Reserved. Welcome to my second article describing the usage of .X files. My previous article, How to Parse .X Files, gave you a quick look at what's required to loading data from an .X file, but gave no real information on what to do with that data. Well, this article is going to pick up the slack and show you how to load and create a frame hierarchy from an .X file. What are Frame Hierarchies? Frame hierarchies are essential to using skinned meshes; the hierarchy defines the underlying bone structure that a deformable mesh is attached to. In order for the mesh to deform, specific vertices are connected to certain bones; as the bones move, so do their respectively attached vertices. This is basic knowledge of the skinned mesh object, and as such, I will not go into it further at this point (rather leaving it to another article!) What I do want to describe to you however is the way an .X file works with a hierarchy. If you're not already familiar with the way .X files store data, it's all done with templates. Not data can exist in an .X file if its not stored in a template. There's a template for just about any kind of information you can think of, and with the .X file format, you can even create your own templates! The only template we're concerned with at this point is of course Frame. A Frame template has one purpose: to contain other templates, thus giving those other templates a base of reference. For that reason, frame templates are typically referred to as reference frame templates, or frame reference templates. When you embed multiple frame templates within each other, you are creating a frame hierarchy. The top-level frame template is considered the parent, while the embedded frame templates are called the children. Take a look at this sample .X file to see what I mean: 
+
+xof 0303txt 0032
+
+
+
+Header {
+
+ 1;
+
+ 0;
+
+ 1;
+
+}
+
+
+
+Frame SceneRoot {
+
+  Frame ChildOfRoot {
+
+    Frame ChildOfChildOfRoot {
+
+    }
+
+  }
+
+  Frame ChildOfRoot2 {
+
+  }
+
+  Frame SiblingOfChildOfRoot {
+
+  }
+
+}
+
+ Above, I have defined four frames. The first, SceneRoot, is the root frame template, as well as being the parent of ChildOfRoot, ChildOfRoot2, and SiblingOfChildOfRoot. You can see that the third frame, ChildOfChildOfRoot is actual the child of the ChildOfRoot template, which means the ChildOfRoot frame is also considered a parent. You'll also notice the SiblingOfChildOfRoot frame; when multiple frames are on the same level as each other (being the children of a parent frame), they are all considered siblings. Those siblings do not effect each other in any way; each sibling only worries about its parent. You may be wondering why this embedding of templates is really necessary. Well, with the frame hierarchy, all child frames inherit the transformations that affect their parents. Thus, if you change the orientation of the ChildOfRoot frame above, the ChildOfChildOfRoot frame will be altered as well (inheriting its parents transformation and adding it to its own). This is synonymous with using skinned meshes - as the underlying bone structure moves, all attached joints must inherit their parents transformations. For instance, rotate your should and your whole arm moves with it. Building a Frame Hierarchy Ok, let's get to work. Building a frame hierarchy starts with a simple structure that contains the name of the frame, as well two pointers that form a linked list of child and sibling frames. This structure is in itself a linked list, having one frame at the top (the root). Here's a structure that should do it all (including the constructor and destructor): 
+
+typedef struct sFrame
+
+{
+
+  char *Name;       // Name of frame
+
+  sFrame *Child;    // Child linked list
+
+  sFrame *Sibling;  // Sibling linked list
+
+  
+
+  sFrame()          // constructor
+
+  {
+
+    Name  = NULL;
+
+    Child = Sibling = NULL;
+
+  }
+
+
+
+  ~sFrame()         // destructor
+
+  {
+
+    delete Name;
+
+    delete Child;
+
+    delete Sibling;
+
+    Name   = NULL;
+
+    Child  = Sibling = NULL;
+
+  }
+
+} sFrame;
+
+ Now at this point, we'll have to turn back to my previous article, How to Parse .X files, to grab the two functions that parse .X file templates. By modifying those two functions slightly, I have added the ability to track the frame hierarchy as it is being built. This works by first creating a scene root frame that all other frames are children to. Passing this frame to the newly written ParseXFileData function ensures that the function knows which frame is the parent at the time. As the ParseXFileData comes across a frame template, it creates a new sFrame structure and adds it to the parent frame linked list as a child, as well as a sibling to any other child frames that may exist. That newly created frame now becomes the parent of any subsequent embedded templates. Here are the newly written functions from my previous article that parse and .X file, while at the same time building a frame hierarchy: 
+
+BOOL ParseXFile(char *Filename)
+
+{
+
+  IDirectXFile           *pDXFile = NULL;
+
+  IDirectXFileEnumObject *pDXEnum = NULL;
+
+  IDirectXFileData       *pDXData = NULL;
+
+
+
+  // Create the .X file object
+
+  if(FAILED(DirectXFileCreate(&pDXFile)))
+
+    return FALSE;
+
+
+
+  // Register the templates in use
+
+  // Use the standard retained mode templates from Direct3D
+
+  if(FAILED(pDXFile->RegisterTemplates(                       \
+
+           (LPVOID)D3DRM_XTEMPLATES,                          \
+
+            D3DRM_XTEMPLATE_BYTES))) {
+
+    pDXFile->Release();
+
+    return FALSE;
+
+  }
+
+
+
+  // Create an enumeration object
+
+  if(FAILED(pDXFile->CreateEnumObject((LPVOID)Filename,       \
+
+             DXFILELOAD_FROMFILE, &pDXEnum))) {
+
+    pDXFile->Release();
+
+    return FALSE;
+
+  }
+
+
+
+  // Create a root frame
+
+  sFrame *ParentFrame = new sFrame();
+
+  ParentFrame->Name = new char[7];
+
+  strcpy(ParentFrame->Name, "$ROOT$");
+
+
+
+  // Enumerate all top-level templates
+
+  while(SUCCEEDED(pDXEnum->GetNextDataObject(&pDXData))) {
+
+    ParseXFileData(pDXData, ParentFrame);
+
+    ReleaseCOM(pDXData);
+
+  }
+
+
+
+  // Release objects
+
+  ReleaseCOM(pDXEnum);
+
+  ReleaseCOM(pDXFile);
+
+
+
+  // Delete the root when no longer needed
+
+  delete ParentFrame;
+
+
+
+  // Return a success
+
+  return TRUE;
+
+}
+
+
+
+void ParseXFileData(IDirectXFileData *pData, sFrame *ParentFrame)
+
+{
+
+  IDirectXFileObject *pSubObj  = NULL;
+
+  IDirectXFileData   *pSubData = NULL;
+
+  IDirectXFileDataReference *pDataRef = NULL;
+
+  const GUID *pType = NULL;
+
+  char       *pName = NULL;
+
+  DWORD       dwSize;
+
+  sFrame     *Frame = NULL;
+
+  sFrame     *SubFrame = NULL;
+
+  
+
+  // Get the template type
+
+  if(FAILED(pData->GetType(&pType)))
+
+    return;
+
+
+
+  // Get the template name (if any)
+
+  if(FAILED(pData->GetName(NULL, &dwSize)))
+
+    return;
+
+  if(dwSize) {
+
+    if((pName = new char[dwSize]) != NULL)
+
+      pData->GetName(pName, &dwSize);
+
+  }
+
+
+
+  // Give template a default name if none found
+
+  if(pName == NULL) {
+
+    if((pName = new char[9]) == NULL)
+
+      return;
+
+    strcpy(pName, "Template");
+
+  }
+
+
+
+  // Set sub frame parent
+
+  SubFrame = ParentFrame;
+
+
+
+  // Process the frame templates
+
+  if(*pType == TID_D3DRMFrame) {
+
+    // Create a frame
+
+    Frame = new sFrame();
+
+
+
+    // Store the name
+
+    Frame->Name = pName;
+
+    pName = NULL;
+
+
+
+    // Add to parent frame as sibling
+
+    Frame->Sibling = ParentFrame->Child;
+
+    ParentFrame->Child = Frame;
+
+
+
+    // Set sub frame parent
+
+    SubFrame = Frame;
+
+
+
+    // Display a message describing which frame it was added to
+
+    char Buffer[1024];
+
+    sprintf(Buffer, "Child frame: %s\r\nParent frame: %s",    \
+
+             Frame->Name, ParentFrame->Name);
+
+    MessageBox(NULL, Buffer, "Added Frame", MB_OK);
+
+  }
+
+
+
+  // Scan for embedded templates
+
+  while(SUCCEEDED(pData->GetNextObject(&pSubObj))) {
+
+
+
+    // Process embedded references
+
+    if(SUCCEEDED(pSubObj->QueryInterface(                     \
+
+         IID_IDirectXFileDataReference, (void**)&pDataRef))) {
+
+      if(SUCCEEDED(pDataRef->Resolve(&pSubData))) {
+
+        ParseXFileData(pSubData, SubFrame);
+
+        ReleaseCOM(pSubData);
+
+      }
+
+      ReleaseCOM(pDataRef);
+
+    }
+
+
+
+    // Process non-referenced embedded templates
+
+    if(SUCCEEDED(pSubObj->QueryInterface(                     \
+
+        IID_IDirectXFileData, (void**)&pSubData))) {
+
+      ParseXFileData(pSubData, SubFrame);
+
+      ReleaseCOM(pSubData);
+
+    }
+
+    ReleaseCOM(pSubObj);
+
+  }
+
+
+
+  // Release name buffer
+
+  delete pName;
+
+}
+
+ If you get the accompanying source code package with this article, it contains a working example of the above code to demonstrate how to start using it in your own projects. Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Building an .X File Frame Hierarchy English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

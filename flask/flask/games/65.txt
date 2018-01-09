@@ -1,0 +1,152 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » DirectX and XNA » Article: Implementing Skin Meshes with DirectX 8 Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Loading and displaying .X files without DirectX How to parse .X files Building an .X File Frame Hierarchy Skinned Mesh Animation Using Matrices Working with the DirectX .X File Format and Animation in DirectX 9.0 Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Implementing Skin Meshes with DirectX 8 By Sarmad Kh Abdulla | Published Jun 06 2002 06:36 PM in DirectX and XNA mesh skin template object matrix end begin frame meshes Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource Skin meshes or skeletal meshes are one of the most important subjects in a 3D world. Skeletal animation is always into focus for the important role they play in organics animation. Skeletal animations are based on the idea that the objects are shaped by multiple bones and can be animated simply by changing the bone's position and orientation. You can find many resources talking about the theory of this subject, but this article talks about the implementation of skeletal meshes with D3D8 and D3DX. But before I start talking about the implementation, I'll give a quick review on the mathematical module behind skin meshes. Overview of Skin Meshes Skin meshes are a type of hierarchical scene. Hierarchical scenes are used to connect objects to each other. For example, a finger is attached to the palm, which in turn is attached to the forearm and so on. The coordinates of every object is given relative to its parent's local space, hence, rotating the forearm will cause the palm and the finger to be moved and rotated as well. The following figure shows how a human body can be constructed using a hierarchical scene. The mathematical formula for this scene is very simple; matrix algebra is the key. For the given scene, if we consider ForearmMat to be the transformation matrix of the forearm, PalmMat to be the transformation matrix of the palm and FingerMat to be the transformation matrix of the finger, then we can simply calculate the transformation matrix of the finger relative to the world by the following formula: FingerWorldMat = FingerMat * PalmMat * ForearmMat * ... * BodyMat In the above formula, we considered that the body is the root of the hierarchical mesh, hence, its matrix is relative to the world space. Having our mesh split into parts where each part is transformed by the world matrix of a specific bone will enable us to animate the mesh easily. However, having the character consisting of separate fixed child objects is not accepted nowadays because it causes cracks at the joints. Hence the rise of skin meshes. Skin meshes got over this problem by having the shape of the smaller parts of the character changing according to the position and orientation of the bones. Skin meshes have the same bone hierarchies, but a single part of a skin mesh can be transformed by more than one bone. Following a linear interpolation formula, vertices can have their position affected by two (or more) bones instead of one bone. Following this method, we can overcome the problem of cracks. This technique is called Vertex Blending. Vertex Blending requires that each vertex have a blending weight(s) so that the vertex shader can determine how the bones affect the vertex. For example, if we have a vertex that's to be affected by two bones, the following formula will give the world's coordinate of the vertex as affected by the two bones: Vw = Vm * M1 * w + Vm * M2 * (1-w) Where Vw is the vertex position in world coordinate. Vm is the vertex position relative to the model's local space. M1 and M2 are the transformation matrices of the two bones. w is the blending weight. Note that the number of blending weights required is less than the number of bones by 1. You can refer to the documentation of DX8 for more details about vertex blending. Skin Meshes and DirectX 8 It's important before starting to implement our skin mesh code to know how DX deals with skin meshes. There are, of course, many file formats that can store skin meshes but the easiest one for us at this time are the X files that's supported by DirectX. X files can store normal static meshes as well as skin meshes. Before we talk about skin meshes, let's have a general idea about X files. I'll talk about the general design of X files and you can refer to the documentation of DX for more detailed info. X files store data as a set of templates. Like the structures of the C language, templates have definitions that decide how the data will be stored in the instances of this template. For each type of templates, you can have one or more instances. There are many types of templates, each one is supposed to store a specific type of data. Templates can have child templates, enabling us to construct hierarchical scenes. Although it's not mandatory, instances of templates can have names. We won't need to deal directly with all types of templates, DX will handle most of the work for us, but we'll need to have some idea about the following templates before we can start our work. Frame This template is used to store a frame. The frame is the building element of the hierarchical scene. Frames have their own transformation matrices and they can hold child objects. Frames can also hold child frames. In skin meshes, a bone refers to a frame. FrameTransformationMatrix As the name implies, this is the transformation matrix for the frame. It's instantiated inside the Frame template. Mesh This template stores a single static mesh along with its materials. In skin meshes, the whole character will be one single mesh and the skinning information specifies how each part of the mesh is affected by the bones. The mesh will be internally split into subsets; each subset will be affected by a specific set of bones. XSkinMeshHeader This template stores information about the nature of skinning information that's exported with the mesh. This template is contained inside the Mesh template. SkinWeights The real skinning information is stored here. This template defines how a specific bone can influence the mesh. This template is instantiated once for each bone that influence the mesh, i.e. if there are 12 bones that influence the mesh, the Mesh template will have 12 SkinWeights templates instantiated inside. The only difference between skin meshes and static meshes is the existence of the XSkinMeshHeader and SkinWeights templates. Removing these two templates from the Mesh template of any skin mesh turns it into a static mesh. Other templates that we'll also deal with hold the animation data. I'll refer back to them later in this article. There are good news and bad news. The good news is that DX will handle all the work needed to load the mesh with its materials and its skinning information. The bad news is that we have to do the rest. We'll need to load the frames and construct the hierarchical scene. We'll also need to link the skin mesh to the bones. In general, X files will hold a hierarchy of frames and one (or more) mesh template with skinning info. We'll have to load each of these separately and then manually link the mesh to its bones (frames). Building an X file with a skin mesh is the modeler's task. After modeling the character with any of the commercial applications, the modeler can easily export his model to an X file using special plugins designed for this purpose. On Microsoft's site, you can find plugins for both 3D Max and Maya that exports X files with few mouse clicks. You can even find applications that have built in support for X files. Now we know how the data is organized in the X file. In order to load the data, we'll need to use the X files library that comes with DX. IDirectXFile is the main interface of the library. IDirectXFile has a method for creating an IDirectXFileEnumObject. The methods of IDirectXFileEnumObject is used to retrieve data from a specific X file. IDirectXFileEnumObject::GetNextDataObject will loop through all the top-level templates in the X file and returns an IDirectXFileData interface. The later is used to retrieve the data of a single template within the X file. Similar to IDirectXFileEnumObject::GetNextDataObject, the method IDirectXFileData::GetNextObject loops through all the child templates and returns an IDirectXFileData interface. The method IDirectXFileData::GetData is used to retrieve the data from the template, but before we can retrieve the data, we need to know the type of the template. The method IDirectXFileData::GetID returns the GUID of the template. For example, if the template is a Frame template, GetID will return TID_D3DRMFrame, which is predefined in the headers of DX. In case you need the name of the instance of that template (as is the case with frames), the method GetName will give it to you. During our navigation through the X file templates, we'll find a template with a GUID equal to TID_D3DRMMesh, which means that it holds a mesh. It's now time for DX to give us some help. The function D3DXLoadSkinMeshFromXof will load the skin mesh with all the complementary data. Just give it a pointer to the IDirectXFileData interface that you have and it'll do the rest. The function D3DXLoadSkinMeshFromXof will give us a pointer to an ID3DXSkinMesh object. This object holds the skin mesh. Internally, this object holds the mesh data as groups. Each group is to be transformed by a different set of bones. The function will also return an array of materials to be used by the skin mesh. As I have mentioned before, it's our job to link the skin mesh to the bones. The D3DXLoadSkinMeshFromXof give us a buffer containing the names of all the bones that influence this mesh. It also gives another buffer containing their transforms. We'll use the names to search through our frame hierarchy for the specified bone. The bone transform is a bit confusing. It's supposed that the transform is included in the frame not here. Actually, this transform is the bone offset. So what is the bone offset? It's important to know that all the vertices of the skin mesh are stored relative to one origin, which is the origin of the mesh and not the local origin of the bone. This means that in order to have the influence of the bone on the mesh, we should deform the mesh by the difference between the bone's current transform and the bone's original transform. Or in other words, we should transform the vertices to the bone's local space and then transform them back to the mesh's space using the new transform of the bone. To make this clearer, let's take an example. Let's say we have a bone positioned at (0,50,0) and a vertex positioned at (0,51,0) and let's assume that this vertex is influenced only by this bone. If we moved the bone from it's original position to this new position (0,51,0), the vertex should be moved to the position (0,52,0), but if we simply multiply the vertex by the bone's transform, the vertex will have its new position equal to (0,102,0) which is the wrong coordinate. So, we'll use the bone's offset matrix to transform the vertex from its original position to a position relative to the bone. The new position will be (0,1,0) which will be transformed by the bone's current matrix to the new position, which is (0,52,0). The procedure is as simple as this: when you use a bone, multiply its current transform matrix by the offset matrix and use the result as the world matrix. Let's get back to our ID3DXSkinMesh object. This object holds the skin mesh in its original form. This object doesn't have any functionality for rendering the skin mesh. So, we'll need first to convert the mesh into an ID3DXMesh object. The function ConvertToBlendedMesh will do the job. Although it's the same object used to render static meshes, the ID3DXMesh obtained from ConvertToBlendedMesh has the difference that its vertices include blending weights, so all we need to do is to enable vertex blending and set our bone matrices before calling the DrawSubset method of the ID3DXMesh. As mentioned before, the mesh will be divided into groups or subsets. Each subset should be rendered with a specific material and a specific set of bones. The structure D3DXBONECOMBINATION specifies the materials and the bones to be used for a single subset of the mesh. An array of this structure is obtained also from the ConvertToBlendedMesh function. All we need to do is to loop through this array, set the material and the bones and then call the DrawSubset method of ID3DXMesh giving it the index within that array. The Implementation Now we're ready to start writing our code for implementing skin meshes. The most important part in the implementation is the design. The following figure shows the design of our code: The figure doesn't show all the members of the classes, it shows only the important ones. As it's shown in the figure, the classes CMeshNode and CFrameNode are both derived from CObject. The purpose of CObject is to provide the link tree mechanism; any object derived from CObject will have the abilities to be linked into a link tree. CFrameNode is the building element of our scene hierarchy and CMeshNode holds the mesh itself. CMeshNode is contained inside CFrameNode, which is contained inside CSkinMesh. The whole scene starts in the CSkinMesh because it holds the root frame. All the operations related to skin meshes will be initiated in the CSkinMesh class which in turn will pass control to the hierarchy as required, hence, the main program will deal only with CSkinMesh; CFrameNode and CMeshNode will be reached only by CSkinMesh. The following algorithms show how the scene is built from the X file: CSkinMesh::Create()
+Begin
+  Initialize X file API
+  Register D3DRM templates
+  Open the X file
+  For every top level template in the X file
+  Begin
+    Retrieve the X file data object
+    Pass the data object to RootFrame.Load
+  End 
+  Link the bones to the skin mesh(es)
+End
+
+CFrameNode::Load()
+Begin
+  Check the type of the data object
+  If the type is Mesh
+  Begin
+    Create new CMeshNode object
+    Attach the new object to the frame
+    Pass the data object to CMeshNode::Create of the new mesh
+  End
+  Else if type is FrameTransformationMatrix
+    Load the transformation matrix
+  Else if type is Frame
+  Begin
+    Create new CFrameNode object
+    Attach the new object to this frame
+    Set the name of the child frame to the name of the template
+    For every child template of the current
+    Begin
+      Retrieve the X file data object
+      Pass it to newframe.Load
+    End
+  End
+End
+
+CMeshNode::Create()
+Begin
+  Set the name of the object to the name of the template
+  Load the skin mesh
+  Generate blended mesh from this skin mesh object
+  Load materials
+End After building the skin mesh, we can start rendering it. The rendering operation will consist of two phases. During the first phase, the world matrix of all the bones is computed (via matrix multiplication) and stored in the CMeshNode object. During the second phase, the skin mesh will be rendered. The following algorithms show this operation: CSkinMesh::Render()
+Begin
+  Calculate the world matrix of all the frames
+  Call CMeshNode::Render of all mesh nodes in the hierarchy
+End
+
+CMeshNode::Render
+Begin
+  Enable vertex blending
+  For every subset in the skin mesh
+  Begin
+    Set the bones' transformation matrices to the device
+    Set the material
+    Render
+  End
+  Set vertex blending back to disabled 
+End Animation in X Files The animations in X files are not specific to skin meshes; they can be applied to any Frame in the X file. X files store key frames and the application should generate the in-between frames using linear interpolation. There are four types of animation keys, rotation, scale, position, and matrix keys. Rotations are stored as quaternions and can be interpolated using spherical linear interpolation. The function D3DXQuaternionSlerp provided by D3DX implements the spherical linear interpolation. The following X file templates are used to store animations: AnimationKey This template is used to store animation keys. Each instance of this template contains the type of the key (position, scale, rotation, or matrix) and the array of keys. Each element in this array contains the value of the key and a DWORD value specifying the time. Animation This template stores the animation keys of a specific frame. It should contain at least one AnimationKey template. It should also contain a reference to the target frame. AnimationSet Acts as a container for Animation templates. The Animation templates contained in this set have the same time values. Implementing Animations In order to implement animations in our skin meshes, we'll need to add a new class. We'll name this class CAnimationNode. This class will hold the animation keys along with a pointer to the target frame. The class will also contain a SetTime function that will update the target frame's transformation matrix with the matrix obtained from the animation keys at the new time value. Each instance of CAnimationNode will hold the data of a single instance of the Animation template. The following figure shows the new design for our code: With the animation taken into consideration, the loading code will be slightly changed. Following is the previous loading code after applying the required changes: CSkinMesh::Create()
+Begin
+  Initialize X file API
+  Register D3DRM templates
+  Open the X file
+  For every top level template in the X file
+  Begin
+    Retrieve the X file data object
+    Pass the data object to RootFrame.Load
+  End 
+  Link the bones to the skin mesh(es)
+  Link the bones to the animations
+End
+
+CFrameNode::Load()
+Begin
+  Check the type of the data object
+  If the type is Mesh
+  Begin
+    Create new CMeshNode object
+    Attach the new object to the frame
+    Pass the data object to CMeshNode::Create of the new mesh
+  End
+  Else if type is FrameTransformationMatrix
+    Load the transformation matrix
+  Else if type is Frame
+  Else if type is Animation
+    Instruct CSkinMesh to load the new animation
+  Begin
+    Create new CFrameNode object
+    Attach the new object to this frame
+    Set the name of the child frame to the name of the template
+    For every child template of the current
+    Begin
+      Retrieve the X file data object
+      Pass it to newframe.Load
+    End
+  End
+End
+
+CSkinMesh::LoadAnimation()
+Begin
+  Create new CAnimationNode object
+  Attach the new object to the link list
+  For every child template
+    Call CAnimationNode::Load for the new animation object
+End
+
+CAnimationNode::Load()
+Begin
+  Check the type of the data object
+  If the type is a reference
+  Begin
+    Get the referenced template, which is a frame template
+    Get the name of it
+		Store the name
+	End
+	Else if type is data
+	Begin
+		Check the type of the animation key
+		Load the key accordingly
+  End
+End The SetTime function is where all the animation functionality is performed. CSkinMesh::SetTime simply calls the SetTime function of all the animation objects. CAnimationNode::SetTime()
+Begin
+  If a matrix key is available
+  Begin
+    Get the nearest matrix to the given time
+    Set it to the target frame
+  End
+  Else
+  Begin
+    Prepare an identity matrix called TransMat
+    If a scale key is available
+    Begin
+      Calculate the accurate scale value
+      Prepare a scale matrix for this scale value
+      Append the matrix to TransMat
+    End
+    If a rotation key is available
+    Begin
+      Calculate the accurate rotation quaternion
+      Prepare a rotation matrix from this value
+      Append the matrix to TransMat
+    End
+    If a position key is available
+    Begin
+      Calculate the accurate position value
+      Prepare a matrix for it
+      Append the matrix to TransMat
+    End
+    Set TransMat to the target frame
+  End
+End Now that you've understood everything related to skin meshes, it's time for you to download the source code (see attached resource file) and try it yourself. Note that the source code is simplified for the sake of clarity. Many of the checking is removed in order to simplify the code. The code assumes that you have a 3D accelerator and it assumes that your system supports the required blending weights. The code uses non-indexed vertex blending. For a more complicated sample, you can refer to the sample that comes with DX8 SDK, which performs a lot of checking and implements both indexed and non-indexed vertex blending. I hope this article was helpful to you. If you have any questions, opinions, suggestions or anything to say, feel free to mail me. Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » DirectX and XNA » Article: Implementing Skin Meshes with DirectX 8 English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

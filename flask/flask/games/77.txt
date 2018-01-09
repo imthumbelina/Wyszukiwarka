@@ -1,0 +1,77 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: A Quick Guide to FMOD Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Sound Formats and Their Uses in Games Enginuity, Part IV Working With AVI Files Streaming Wave Files with DirectSound A Beginners Guide to Csound Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 3Likes Dislike A Quick Guide to FMOD By Joachim Rohde | Published May 21 2004 05:55 AM in Game Programming play fmod file sample want handle sound song parameter Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource What is FMOD? FMOD is an easy to use crossplatform audio engine, available on the Windows, Windows CE, Linux, Macintosh, GameCube, Playstation 2 and XBox platforms. It can be used with C/C++, Visual Basic,Delphi and MASM. So, if you use one of those languages on one of these platforms and you want to use sound in your application, FMOD is made for you. The examples below will be in C although thebasic principles should be the same across all platforms. Alternatives One alternative might be OpenAL. OpenAL is another crossplatform audio API which is available for Windows, Linux and Macintosh and can be used with C/C++,Delphi and Java. The style is similar to OpenGL (for example, the extensions technique is also used here). A Windows-specific alternative would be DirectSound which is part of Microsoft's DirectX. What does it cost? The developers of FMOD have a nice philosophy; if you don't intend to make any money with your project, you can use it for free. So as long as you don't make any profit with your program you don'thave to pay anything. However if turns out that you will sell your product you would then have to buy a license, starting at $100 for shareware products. For more details have a look the officiallicence price list at fmod.org. From where can I get it? To use FMOD in your application you need the headers and the library which can be downloaded from http://www.fmod.org. At this time the recent version is 3.70. Beaware that this version is not backwards compatible any more! Getting Started After unpacking the archive, you should copy the FMOD.DLL into your working directory or better still, into the directory where your executable file will be. Before we can really start we have to do one last thing. For C users Now you only have to include the header "fmod.h" and depending on your compiler, the right import library: fmodvc.lib for Microsoft Visual C++ and Codewarrior fmodbc.lib for Borland fmodwc.lib for Watcom fmodcc.lib for LCC-Win32 libfmod.a for MingW and CygWin fmod-3-7.lib for GCC For Delphi users Include the unit FMOD in your uses clause. For Visual Basic users Add fmod.bas to your project. Initialization Before we can use FMOD to play some sounds for us we need to initialize it. This is pretty simple: FSOUND_Init (44100, 32, 0);The first parameter is our output rate in hertz. In our example it's equal to 44100. The second parameter is our maximum number of software channels. It doesn't matter if you choose a highernumber due to the fact that it won't affect your cpu usage as long as you don't really use them. However 32 should be more than enough for this short introduction. In the third parameter can we specify some flags if we want to. We leave this parameter as 0. That's it. Now we are ready to play some sounds. But in which format do we have out sounds? Is it a song, a sample or a stream? Songs, Samples and Streams Now it's time to mention that FMOD is subdivided in two APIs; FSOUND and FMUSIC. Which one you should use depends on the files you want to play. Sequenced music files like .MOD, .S3M, .XM, .IT, .MID, .RMI, .SGT or .FSB are called songs and are supported by the FMUSIC api. On the other hand, the FSOUND api is for PCM based or compressed files like .WAV, .MP2, .MP3, .OGG or .RAW. They can be treated as either samples or streams. If you want to play a short sound / asmall file like a gunshot then you treat the file as an sample. Samples will be decompressed into memory before being played and can be played multiple times. When you want to play a bigger file likecontinuous background music then you handle the file as a stream. This will result in more cpu usage because the file will be streamed from the disk in realtime, but also needs less memory as aresult. Another thing to note is that streams cannot be played multiple times at once. FMUSIC Let's rock! To play a song you need a FMUSIC_MODULE variable for the handle and following two lines: handle=FMUSIC_LoadSong("YourFileName");
+FMUSIC_PlaySong(handle);You will notice that from now on almost every function needs the handle as the first parameter. Let's get loud Now, that your song is playing you can manipulate it in several ways. To make it louder you use: FMUSIC_SetMasterVolume (handle, 256);With 256 we set the volume to the maximum. If we would have passed 0 we would have have silence. To pause our song we use: FMUSIC_SetPaused (handle, true);and FMUSIC_SetPaused (handle, false);when we want to unpause it. For background music it would be nice if our music would play in an endless loop. No problem: FMUSIC_SetLooping (handle, true);And when we are tired of hearing the music we will stop it with: FMUSIC_StopSong (handle); Cleaning Up To free the allocated memory from a song you should simply call: FMUSIC_FreeSong (handle);and we're done. Pretty easy, isn't it? A small simple console example In this example (for Windows compilers) we'll play a file called 'canyon.mid' and wait until the user hits a key to exit the program. Remember to link the correct library and use the right pathsfor the header and the midi file. #include <conio.h>
+#include "inc/fmod.h"
+
+FMUSIC_MODULE* handle;
+
+int main ()
+{
+   // init FMOD sound system
+   FSOUND_Init (44100, 32, 0);
+
+   // load song
+   handle=FMUSIC_LoadSong ("canyon.mid");
+
+   // play song only once
+   // when you want to play a midi file you have to disable looping
+   // BEFORE playing the song else this command has no effect!
+   FMUSIC_SetLooping (handle, false);
+
+   // play song
+   FMUSIC_PlaySong (handle);
+
+   // wait until the users hits a key to end the app
+   while (!_kbhit())
+   {
+   }
+
+   //clean up
+   FMUSIC_FreeSong (handle);
+   FSOUND_Close();
+} FSOUND Due to the fact that you have more possibilities while using FSOUND it's a little bit more complicated. For instance, you have several channels which you can use simultaneously. But in this shortintroduction we will only be using one. First we have a look at samples, and afterwards we move on to streams. Samples Let's rock! To play a sample you need a FSOUND_SAMPLE variable for the handle and following two lines: handle=FSOUND_Sample_Load (0,"YourFileName",0,0,0);
+FSOUND_PlaySound (0,handle);The first command loads the sample. For the beginning only the second parameter is relevant - the name of the file you want to play! The rest is important when you want to use more than onesample, play a file from memory, etc. The second command plays the actual sample. The first parameter is the channel number you want to use and the second one the handle of the sound to play. Takecare that the file that you want to play is not that big! Otherwise, it will take a while until the file will be played because it is first loaded completely into memory. Let's get loud Now, that your sample is playing you can manipulate it in several ways. To make it louder you use: FSOUND_SetVolume (handle, 255);With 255 we set the volume to the maximum. As with the music, if we had had passed 0 we would have had silence. You can adjust the volume for a sample by passing a handle, or you can also adjust achannel by passing the relevant channel number instead of a handle. To pause our sample we use: FSOUND_SetPaused (handle, true);and FSOUND_SetPaused (handle, false);if we want to unpause it. Again the first parameter can be a channel number. When we want to stop the sample we just use: FSOUND_StopSound (handle);And once again can the parameter be a channel number. Cleaning up To unload the sample a simple FSOUND_Sample_Free (handle);is enough. A small simple console example Nothing fancy here. This snippet just plays the file sample.mp3. #include <conio.h>
+#include "inc/fmod.h"
+
+FSOUND_SAMPLE* handle;
+
+int main ()
+{
+   // init FMOD sound system
+   FSOUND_Init (44100, 32, 0);
+
+   // load and play sample
+   handle=FSOUND_Sample_Load (0,"sample.mp3",0, 0, 0);
+   FSOUND_PlaySound (0,handle);
+
+   // wait until the users hits a key to end the app
+   while (!_kbhit())
+   {
+   }
+
+   // clean up
+   FSOUND_Sample_Free (handle);
+   FSOUND_Close();
+} Streams Let's rock! To play a stream you need a FSOUND_STREAM variable for the handle and the following two lines: handle=FSOUND_Stream_Open("YourFileName",0, 0, 0);
+FSOUND_Stream_Play (0,handle);It's pretty much the same as samples so nothing more to say here. Note: Take care that you're using at least version 3.7. In earlier versions the command for opening a stream was different! Let's get loud Here you can use the same functions as listed with the samples. I just want to mention one additional function here: To stop a stream you use: FSOUND_Stream_Stop (handle); Cleaning up To unload the stream a simple FSOUND_Stream_Close(handle);is enough. A small simple console example This small example streams the file sample.mp3. #include <conio.h>
+#include "inc/fmod.h"
+
+FSOUND_STREAM* handle;
+
+void main ()
+{
+   //init FMOD sound system
+   FSOUND_Init (44100, 32, 0);
+
+   //load and play sample
+   handle=FSOUND_Stream_Open("sample.mp3",0, 0, 0);
+   FSOUND_Stream_Play (0,handle);
+
+   //wait until the users hits a key to end the app
+   while (!_kbhit())
+   {
+   }
+
+   //clean up
+   FSOUND_Stream_Close(handle);
+   FSOUND_Close();
+} Shutting Down To shut down the FMOD sound system just call at the end of your program: FSOUND_Close (); What's coming next? Of course are there more things you can do with FMOD. 3D sound, handling CDs and effects are just a few to mention. All in all it's not that complicated but it is definitely pretty powerful. So,it should be easy to read through the help file and find what you need. Final Words I wrote this short article after I saw the article about OpenAL by Lee Winder at Gamedev.net. A short time later the question about how to play sound in an application came up in the forum. Even though the FMOD API comes complete with some examplesand brief tutorials these might not seem as simple at the first glance. I hope this article was useful for you. For any comments, questions, feedback, etc. send me an email at webmaster@joachimrohde.de. Joachim Rohde Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: A Quick Guide to FMOD English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

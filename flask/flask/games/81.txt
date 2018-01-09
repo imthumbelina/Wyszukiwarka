@@ -1,0 +1,535 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Loading 3DS Files Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Example of Processing Mouse Events in OpenGL Random maze-generator FAQ Enginuity, Part V Parallel Algorithm Framework Example of the Minimal Win32 & OpenGL program Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Loading 3DS Files By P.P.A.Narayanan | Published Dec 18 2000 04:37 AM in Game Programming case null break bin3ds material name read break int Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource So, you have your 3D engine (written in D3DIM or OpenGL) up and running, but you only have 2 or 3 cubes or spheres on the screen. Time to add some more complex models. The code below listed can be used to load a 3D Studio R3 or higher .3DS files. The code loads only the vertex data, face data and materials. It ignores all other information (like camera, light, keyframe data etc), since for my purposes, I only need the mesh loaded. If you think the code is written badly, I don't care! because it does the job and it was my desperate attempt to load some mesh into my D3DIM 3D Engine. But the code is (I hope!) simple and self explanatory for an average C/C++ programmer (or for that matter any programmer who can read C/C++ code). I have added some comments, see if it helps you. The code reads the .3ds file and creates a material list and mesh object list. The material list contains all the materials used by the mesh. The mesh contains references to the material in the material list (i.e the name). The flag present along with face data gives the order of the faces for calculating face normals. Only the first (I think!) 3 bits are used. The code ignores the flag because I don't need it, but if you figure out the use of that flag, please let me know. Ignoring the flag in some files inverts the face normals for some faces, so it becomes invisible. But other files it works okay. BTW the transformation matrix contains the local axis and local origin (if it is of any use 2 you). If you have any questions about the code, or info about how to load camera/lights and other things.... you can contact me at digicrush_ii@rediff.com. Note: You'll need to modify the code in order to make it work with your engine. I had to cut this out of a project that I am working on, so it might or might not compile right away... If anyone else out there is developing a 3-D engine and wants to share code/ideas, feel free to e-mail me at digicrush_ii@rediff.com. (FYI I'm using Visual C++ 6.0 with DX7.0) Happy rendering! By P.P.A.Narayanan (DiGiTaL-CrUsHeR) (digicrush_ii@rediff.com) Download the code via the attached resource file, or see it below. // Copyright (c) 2000. Aanand Narayanan.P.P
+// For questions email digicrush_ii@rediff.com
+// Reads a .3ds file and create a linked list of objects
+#include <windows.h>
+#define D3DOVERLOADS
+#include <d3d.h>
+
+typedef struct _map_list
+{
+  char filename[256];  // Mapping filename (Texture)
+  float u;         	// U scale
+  float v;         	// V scale
+  float uoff;      	// U Offset
+  float voff;      	// V Offset
+  float rot;       	// Rotation angle
+  _map_list *next;
+}map_list;
+typedef struct _mat_list
+{
+  char name[200];  // Material name
+  DWORD ambient;   // Ambient color (RGBA)
+  DWORD diffuse;   // Diffuse color (RGBA)
+  DWORD specular;  // Specular color (RGBA)
+  _map_list *htex, *ttex;	// Texture maps (presently only 1 is used. diffused map)
+  _mat_list *next;
+}mat_list;
+typedef struct _face_mat
+{
+  char name[200];// Material Name
+  WORD ne;   	// No. of entries
+  WORD *faces;   // Faces assigned to this material
+  _face_mat *next;
+}face_mat;
+typedef struct _mesh_object
+{
+  char name[200];   // Object name
+  float *vlst;  	// Vertex list
+  WORD *flst;   	// Face list
+  WORD nv;      	// No. of vertices
+  WORD nf;      	// No. of faces
+  WORD mnv;     	// No. of vertices having mapping coords.
+  float *mc;    	// Mapping coords. as U,V pairs (actual texture coordinates)
+  float lmat[4][4]; // Local transformation matrix
+  _mesh_object *next;  // Pointer to the next object
+  face_mat *fhead, *ftail;
+}mesh_object;
+
+
+char temp_name [100];
+float trans_mat [4][4]; // translation matrix for objects
+FILE *bin3ds;
+mesh_object *head=NULL, *tail=NULL;
+mat_list *mathead=NULL, *mattail=NULL;
+map_list *maphead=NULL, *maptail=NULL;
+
+void ReadObject();
+
+unsigned char ReadChar (void)
+{
+ return (fgetc (bin3ds));
+}
+unsigned int ReadInt (void)
+{
+ unsigned int temp = ReadChar(); 	 
+ return ( temp | (ReadChar () << 8));  // I really don't know Y I'm do'n this, too lazy to change
+}
+unsigned long ReadLong (void)
+{
+ unsigned long temp1,temp2;
+
+ temp1=ReadInt ();
+ temp2=ReadInt ();
+
+ return (temp1 | (temp2 << 16)); // same as above
+}
+void read_mat(DWORD len)
+{
+  unsigned long count=ftell(bin3ds) + (len - 6);
+  WORD id;
+  DWORD llen;
+  int done = 0;
+  BOOL is_ambient = FALSE;
+  BOOL is_diffuse = FALSE;
+  BOOL is_specular = FALSE;
+  // Allocate a new material
+  if(mathead == NULL)          	 
+  {
+	mathead = new mat_list;
+	mattail = mathead;
+  }
+  else
+  {
+	mattail->next = new mat_list;
+	mattail = mattail->next;
+  }
+  mattail->next = NULL;
+  mattail->htex = NULL;
+  while(!done)
+  {
+	id = ReadInt();
+	if(feof(bin3ds)) // OOPS! EOF
+	{ 
+  	done = 1;
+  	break; 
+	}
+	llen = ReadLong();
+	switch(id)
+	{
+	case 0xA000:
+  	{
+    	int i=0;
+    	char ch;
+    	mattail->next = NULL;
+    	// Read material name
+    	while((ch = fgetc(bin3ds)) != 0)
+    	{
+      	mattail->name[i] = ch;
+      	i++;
+    	}
+    	mattail->name[i] = '\0';
+  	}break;
+	case 0xA010:
+  	{
+    	// Hey! AMBIENT
+    	is_diffuse = FALSE;
+    	is_specular = FALSE;
+    	is_ambient = TRUE;
+    	mattail->ambient = 0;
+  	}break;
+	case 0xA020:
+  	{
+    	// Hey! DIFFUSE
+    	is_diffuse = TRUE;
+    	is_specular = FALSE;
+    	is_ambient = FALSE;
+    	mattail->diffuse = 0;
+  	}break;
+	case 0xA030:
+  	{
+    	// OH! SPECULAR
+    	is_diffuse = FALSE;
+    	is_specular = TRUE;
+    	is_ambient = FALSE;
+    	mattail->specular = 0;
+  	}break;
+	case 0xA200:
+  	{
+    	// Texture
+    	if(mattail->htex == NULL)
+    	{
+      	mattail->htex = new _map_list;
+      	mattail->htex->next = NULL;
+      	mattail->ttex = mattail->htex;
+    	}
+    	else
+    	{
+      	mattail->ttex->next = new _map_list;
+      	mattail->ttex = mattail->ttex->next;
+      	mattail->ttex->next = NULL;
+    	}
+    	mattail->ttex->u = mattail->ttex->v = mattail->ttex->uoff = mattail->ttex->voff = 0.0;
+    	mattail->ttex->rot = 0.0;
+  	}break;
+	case 0xA300:
+  	{
+    	// Texture name (filename with out path)
+    	char ch;
+    	int i=0;
+    	while((ch = fgetc(bin3ds)) != 0)
+    	{
+      	mattail->ttex->filename[i] = ch;
+      	i++;
+    	}
+    	mattail->ttex->filename[i] = '\0';
+  	}break;
+	case 0xA354:
+  	{
+    	// V coords
+    	fread(&(mattail->ttex->v), sizeof(float), 1, bin3ds);
+  	}break;
+	case 0xA356:
+  	{
+    	// U coords
+    	fread(&(mattail->ttex->u), sizeof(float), 1, bin3ds);
+  	}break;
+	case 0xA358:
+  	{
+    	// U offset
+    	fread(&(mattail->ttex->uoff), sizeof(float), 1, bin3ds);
+  	}break;
+	case 0xA35A:
+  	{
+    	// V offset
+    	fread(&(mattail->ttex->voff), sizeof(float), 1, bin3ds);
+  	}break;
+	case 0xA35C:
+  	{
+    	// Texture rotation angle
+    	fread(&(mattail->ttex->rot), sizeof(float), 1, bin3ds);
+  	}break;
+	case 0x0011:
+  	{
+    	char r, g, b;
+    	// Read colors
+    	if(is_diffuse)
+    	{
+      	fread(&r, 1, 1, bin3ds); // Red component 1 byte
+      	fread(&g, 1, 1, bin3ds); // Green component 1 byte
+      	fread(&b, 1, 1, bin3ds); // Blue component 1 byte
+      	mattail->diffuse = long((r&0xFF)<<16) | long((g&0xFF)<<8) | long(b&0xFF);
+    	}
+    	else if(is_ambient)
+    	{
+      	fread(&r, 1, 1, bin3ds); // Red component 1 byte
+      	fread(&g, 1, 1, bin3ds); // Green component 1 byte
+      	fread(&b, 1, 1, bin3ds); // Blue component 1 byte
+      	mattail->ambient = long((r&0xFF)<<16) | long((g&0xFF)<<8) | long(b&0xFF);
+    	}
+    	if(is_specular)
+    	{
+      	fread(&r, 1, 1, bin3ds); // Red component 1 byte
+      	fread(&g, 1, 1, bin3ds); // Green component 1 byte
+      	fread(&b, 1, 1, bin3ds); // Blue component 1 byte
+      	mattail->specular = long((r&0xFF)<<16) | long((g&0xFF)<<8) | long(b&0xFF);
+    	}
+  	}break;
+	default:
+  	{
+    	unsigned long pos;
+    	pos = ftell(bin3ds);
+    	if((pos - 6) >= count) // Check if v've crossed the chunk bound.
+    	{
+      	fseek(bin3ds, -6, SEEK_CUR);
+      	done = 1;
+      	break;
+    	}
+    	// Unknow CHUNK ID
+    	pos += (llen - 6);
+    	if(fseek(bin3ds, pos, SEEK_SET)) done = 1;
+  	}
+	}
+  }
+}
+void read_mesh(DWORD len)
+{
+  unsigned long count=ftell(bin3ds) + (len - 6);
+  WORD id;
+  DWORD llen;
+  int done = 0;
+  while(!done)
+  {
+	id = ReadInt();
+	if(feof(bin3ds)) { done = 1; break; }
+	llen = ReadLong();
+	switch(id)
+	{
+	case 0x4100: 
+  	{
+    	if(tail == NULL) break;
+  	}break;
+	case 0x4110:
+  	{
+    	int i;
+    	tail->nv = ReadInt(); // No. of vertices
+    	tail->vlst = new float[tail->nv * 3];
+    	// Read vertices
+    	for(i=0; inv; i++)
+    	{
+      	fread(&(tail->vlst[i*3]), sizeof(float), 1, bin3ds);   
+      	fread(&(tail->vlst[i*3+2]), sizeof(float), 1, bin3ds);  // Swap z and y
+      	fread(&(tail->vlst[i*3+1]), sizeof(float), 1, bin3ds);
+    	}
+  	}break;
+	case 0x4120:
+  	{
+    	int i;
+    	unsigned int nf;
+    	nf = ReadInt(); // No. of faces
+    	tail->nf = nf; 
+    	tail->flst = new WORD[tail->nf * 4];
+    	// Read all the faces
+    	for(i=0; inf; i++)
+    	{
+      	fread(&(tail->flst[i*4+2]), sizeof(WORD), 1, bin3ds);   // clock wise order
+      	fread(&(tail->flst[i*4+1]), sizeof(WORD), 1, bin3ds);  // worth experiment'n
+      	fread(&(tail->flst[i*4+0]), sizeof(WORD), 1, bin3ds);
+      	fread(&(tail->flst[i*4+3]), sizeof(WORD), 1, bin3ds);  // face order
+    	}
+  	}break;
+	case 0x4130:
+  	{
+    	// Material mapping Info.
+    	int i=0;
+    	char ch;
+    	if(tail == NULL) break;
+    	if(tail->fhead == NULL)
+    	{
+      	tail->fhead = new face_mat;
+      	tail->ftail = tail->fhead;
+    	}
+    	else
+    	{
+      	tail->ftail->next = new face_mat;
+      	tail->ftail = tail->ftail->next;
+    	}
+    	tail->ftail->next = NULL;
+    	// Read material name
+    	while((ch = fgetc(bin3ds)) != 0)
+    	{
+      	tail->ftail->name[i] = ch;
+      	i++;
+    	}
+    	tail->ftail->name[i] = '\0';
+    	// Read no. of faces for this material
+    	tail->ftail->ne = ReadInt();
+    	tail->ftail->faces = new WORD[tail->ftail->ne];
+    	// read all faces (actually indices to the face list)
+    	fread(tail->ftail->faces, sizeof(WORD)*tail->ftail->ne, 1, bin3ds);
+  	}break;
+	case 0x4140:
+  	{
+    	// Material mapping coords
+    	if(tail == NULL) break;
+    	int i;
+    	tail->mnv = ReadInt(); // No. of mapping coords
+    	tail->mc = new float[tail->mnv * 2];
+    	// Read mapping coords
+    	// These are actually texture coords for vertices.
+    	for(i=0; imnv; i++)
+    	{
+      	fread(&(tail->mc[i*2]), sizeof(float), 1, bin3ds); // U
+      	fread(&(tail->mc[i*2+1]), sizeof(float), 1, bin3ds);  // V
+    	}
+  	}break;
+	case 0x4160:
+  	{
+    	// Local transformation matrix
+    	int i, j;
+    	if(tail == NULL) break;
+    	for (j=0;j<4;j++)
+    	{
+      	for (i=0;i<3;i++)
+      	{
+        	fread(&(tail->lmat[j][i]),sizeof (float),1,bin3ds);
+      	}
+    	}
+    	tail->lmat[0][3]=0;
+    	tail->lmat[1][3]=0;
+    	tail->lmat[2][3]=0;
+    	tail->lmat[3][3]=1;
+  	}break;
+	case 0x4000:
+  	{
+    	// Object
+    	fseek(bin3ds, -6, SEEK_CUR);
+    	done = 1;
+    	break;
+  	}
+	default: // Unknown CHUNK
+  	{
+    	unsigned long pos;
+    	pos = ftell(bin3ds);
+    	if((pos - 6) >= count)
+    	{
+      	fseek(bin3ds, -6, SEEK_CUR);
+      	done = 1;
+      	break;
+    	}
+    	pos += (llen - 6);
+    	if(fseek(bin3ds, pos, SEEK_SET)) done = 1;
+  	}
+	}
+  }
+}
+void read_object(DWORD len)
+{
+  unsigned long count=ftell(bin3ds) + (len - 6);
+  WORD id;
+  DWORD llen;
+  int done = 0;
+  head = tail = NULL;
+  maphead = maptail = NULL;
+  mathead = mattail = NULL;
+  while(!done)
+  {
+	id = ReadInt();
+	if(feof(bin3ds)) { break; done = 1; }
+	llen = ReadLong(); // length of chunk
+	switch(id)
+	{
+	case 0x4000:
+  	{
+    	// He He! MESH!
+    	int u=0;
+    	char ch;
+    	if(head == NULL)
+    	{
+      	head = new mesh_object;
+      	tail = head;
+    	}
+    	else
+    	{
+      	tail->next = new mesh_object;
+      	tail = tail->next;
+    	}
+    	// Initialize
+    	tail->next = NULL;
+    	tail->flst = NULL;
+    	tail->vlst = NULL;
+    	tail->nf = 0;
+    	tail->nv = 0;
+    	tail->mnv = 0;
+    	tail->mc = NULL;
+    	tail->fhead = NULL;
+    	tail->ftail = NULL;
+    	// Read mesh name (object name)
+    	while((ch = fgetc(bin3ds)) != 0)
+    	{
+      	tail->name[u] = ch;
+      	u++;
+    	}
+    	tail->name[u] = '\0';
+    	read_mesh(llen);
+    	if(tail->nv == 0)    	// Object was not a mesh (might be a light etc)
+    	{
+      	// So free up the previously allocated mem (if any)
+      	if(tail->flst != NULL) delete tail->flst;
+      	if(tail->vlst != NULL) delete tail->vlst;
+      	if(tail == head) // check if first mesh
+      	{
+        	delete tail;
+        	tail = head = NULL;
+      	}
+      	else // No, then detach last and relocate tail
+      	{
+        	mesh_object *t, *p;
+        	t = p = head;
+        	while(t != NULL)
+        	{
+          	if(t == tail) break;
+          	else
+          	{
+            	p = t;
+            	t = t->next;
+          	}
+        	}
+        	delete tail;
+        	tail = p;
+        	tail->next = NULL;
+      	}
+    	}
+  	}break;
+	case 0xAFFF: read_mat(llen); break;  // Read materials
+	default: // Unknown
+  	{
+    	unsigned long pos;
+    	pos = ftell(bin3ds);
+    	if((pos - 6) >= count)
+    	{
+      	fseek(bin3ds, -6, SEEK_CUR);
+      	done = 1;
+      	break;
+    	}
+    	pos += (llen - 6);
+    	if(fseek(bin3ds, pos, SEEK_SET)) done = 1;
+  	}
+	}
+  }
+}
+int read_3ds()
+{
+  WORD id;
+  DWORD len;
+  int done = 0;
+  while(!done)
+  {
+	id = ReadInt();
+	if(feof(bin3ds)) { break; done = 1; }
+	len = ReadLong();
+	switch(id)
+	{
+	case 0xFFFF: done = 1; break;
+	case 0x3D3D: read_object(len); break; // Read Objects
+	default: // Unknown
+  	{
+    	unsigned long pos;
+    	pos = ftell(bin3ds);
+    	pos += (len - 6);
+    	if(fseek(bin3ds, pos, SEEK_SET)) done = 1;
+  	} break;
+	}
+	if(feof(bin3ds)) done = 1;
+  }
+  return 1;
+}
+
+int read_primary_chunk (void)
+{
+  unsigned char version;
+  
+  if (ReadInt ()==0x4D4D)
+  {
+	fseek (bin3ds,28L,SEEK_SET);
+	version=ReadChar ();
+	if (version<3)
+	{
+  	// Invalid version
+  	return 1;
+	}
+	fseek (bin3ds, 16, SEEK_SET); // Relocate to chunk start
+	read_3ds();
+  }
+  else
+	return (1);
+  
+  return (0); 
+}
+int load_3ds(FILE *fp)
+{
+  char buf[6] = ".PMF";
+  WORD ver = 0x0002;
+  unsigned long sz;
+  int st;
+  if(fp == NULL) return -1;
+  bin3ds = fp;
+  fseek(bin3ds, 0, SEEK_SET); // Just to make sure 
+  while (read_primary_chunk ()==0);
+    	// TODO: IMPORTANT!!!!!!
+    	// Free all the linked list here after u do watever u want to do 
+    	// with the obj data (i.e u could write the data to a custom format file.
+  // I use my own mesh format)
+  return (0);
+}
+
+// Code end here Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Loading 3DS Files English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

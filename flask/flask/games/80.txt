@@ -1,0 +1,114 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Loading a Wave File Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Loading 3DS Files Enginuity, Part V Streaming Wave Files with DirectSound How to Load a Bitmap Intro To 3D Engines w/ Glide Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Loading a Wave File By Nathan Davidson | Published Sep 14 1999 05:32 AM in Game Programming file wave value bit bytes //read riff sound Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource I get tons of e-mail asking me how to load in a wave file so it can be used and played in programs. This tutorial will hopefully answer these question and i'll provide some C source code on how to do this - no this won't be the most beautiful or efficient code, there are definitely ways to speed up this loading process, rather, this will be a way of providing easy instructions and some code for those trying to load .wav files. I suggest you also get my Wave File Format description on my website and look at it first and use it in conjunction with this. Some Windows compilers have functions that will automatically load a wave file in for you, but then you lose control of how quickly the data is being read in and you may not have access to all the information you'd get if you loaded it yourself, and you also lose any chance of optimizing the code if you're working with large groups of sound files that require as much speed as possible, so i'll show you how it's done and you can edit the process to your liking. Ok let's get going... A Wave file, like many graphic and sound files, has a header file at the beginning that describes the sound data contained in the file. This header was created by Microsoft and contains everything we need to know about the sound file and then some. The first 4 bytes in a wave file header in determining if the file we opened is really a wave file. The first four bytes should contain the text "RIFF", RIFF means that it's a microsoft media file of some sort, if we have RIFF it may not necessarily mean we have a wave sound file, RIFF is also at the start of MIDI and other various multimedia files. The next 4 bytes is a 32 bit value describing how big the rest of the file is going to be (not including those first four "RIFF" bytes). Let's write some code to open up a file and read these in: FILE *fp;
+
+fp = fopen("sound.wav","rb);
+if (fp)
+{
+   BYTE id[4]; //four bytes to hold 'RIFF'
+   DWORD size; //32 bit value to hold file size
+
+   fread(id,sizeof(BYTE),4,fp); //read in first four bytes
+   if (!strcmp(id,"RIFF"))
+   { //we had 'RIFF' let's continue
+   	fread(size,sizeof(DWORD),1,fp);
+   	//read in 32bit size value
+   }
+} Ok that'll get the first part read in if we read in id and it isn't equal to RIFF then we know this isn't a wave file, if it is then we can continue on. After the 32 bit size value we now should have two more strings to read in that will positively ID the file as a wave file or not. We'll now read in another 4 bytes which should contain the string "WAVE" and then another 4 byte string containing the word "fmt " (notice the extra space after fmt ). The "fmt " string let's us know that the format chunk is coming up afterwards. Let's update our code to reflect this now: FILE *fp;
+
+fp = fopen("sound.wav","rb);
+if (fp)
+{
+    BYTE id[4]; //four bytes to hold 'RIFF'
+    DWORD size; //32 bit value to hold file size
+
+    fread(id,sizeof(BYTE),4,fp); //read in first four bytes
+    if (!strcmp(id,"RIFF"))
+    { //we had 'RIFF' let's continue
+        fread(size,sizeof(DWORD),1,fp);
+        //read in 32bit size value
+        fread(id,sizeof(BYTE),4,fp);
+        //read in 4 byte string now
+        if (!strcmp(id,"WAVE"))
+        { //this is probably a wave file since it contained "WAVE"
+            fread(id,sizeof(BYTE),4,fp); //read in 4 bytes "fmt ";
+        }
+    }
+}
+ After "fmt " we have a 32 bit value that says how big our following format chunk is going to be, for a typical wave file this will be "16", meaning that we're going to use the next 16 bytes in the file to describe the sound data's format. Be careful though, this value may not always be a 16 - wave files that are compressed (like ADPCM or such) use different format chunk sizes and you may need to adjust, if you don't have a 16 here you may want to abort the load unless you know about the way the compressed file stores it's format info. Let's see what those next 16 bytes are going to be in a typical wave file: 32 bit value saying how big the format chunk is (in bytes) 16 bit value identifying the format tag (identifies way data is stored, 1 here means no compression (PCM), if otherwise it's some other type of format) 16 bit value describing # of channels (1 means mono, 2 means stereo) 32 bit value describing sample rate or number of samples per second (like 44100, 22050, or 11025) 32 bit value describing average # of bytes per second (found by: samplerate*channels*(bitspersample/8)) you probably won't need or use this value 16 bit value describing block alignment (found by: (bitspersample/8)*channels) you probably won't need or use this value either 16 bit value describing bits per sample (8bit or 16bit sound) Ok now that we know what those next 16 bytes describing the format are, let's add some source code to reflect this: FILE *fp;
+
+fp = fopen("sound.wav","rb);
+if (fp)
+{
+    BYTE id[4]; //four bytes to hold 'RIFF'
+    DWORD size; //32 bit value to hold file size
+	//our 16 bit format info values
+    short format_tag, channels, block_align, bits_per_sample;
+    DWORD format_length, sample_rate, avg_bytes_sec; //our 32 bit format info values
+
+    fread(id, sizeof(BYTE), 4, fp); //read in first four bytes
+    if (!strcmp(id, "RIFF"))
+    { //we had 'RIFF' let's continue
+        fread(size, sizeof(DWORD), 1, fp); //read in 32bit size value
+        fread(id, sizeof(BYTE), 4, fp); //read in 4 byte string now
+        if (!strcmp(id,"WAVE"))
+        { //this is probably a wave file since it contained "WAVE"
+            fread(id, sizeof(BYTE), 4, fp); //read in 4 bytes "fmt ";
+            fread(format_length, sizeof(DWORD),1,fp);
+            fread(format_tag, sizeof(short), 1, fp);
+            fread(channels, sizeof(short),1,fp);
+            fread(sample_rate, sizeof(DWORD), 1, fp);
+            fread(avg_bytes_sec, sizeof(short), 1, fp);
+            fread(block_align, sizeof(short), 1, fp);
+            fread(bits_per_sample, sizeof(short), 1, fp);
+        }
+        else
+            printf("Error: RIFF file but not a wave file\n");
+    }
+    else
+        printf("Error: not a RIFF file\n");
+} Alright, now we're just about ready to get to the good stuff - the actual sound data, but first we must read in, you guessed it, a 4 byte string containing the word "data" and then a 32 bit value describing how big our data chunk or raw sound chunk is (in bytes). Once we know how big our data chunk is we can set aside the space needed using malloc and start reading in the good stuff. That's all there is to reading in a wave file, and we'll finish up our function: void Load_Wave_File(char *fname)
+{
+    FILE *fp;
+
+    fp = fopen(fname,"rb);
+    if (fp)
+    {
+        BYTE id[4], *sound_buffer; //four bytes to hold 'RIFF'
+        DWORD size; //32 bit value to hold file size
+        short format_tag, channels, block_align, bits_per_sample; //our 16 values
+        DWORD format_length, sample_rate, avg_bytes_sec, data_size, i; //our 32 bit values
+
+        fread(id, sizeof(BYTE), 4, fp); //read in first four bytes
+        if (!strcmp(id, "RIFF"))
+        { //we had 'RIFF' let's continue
+            fread(size, sizeof(DWORD), 1, fp); //read in 32bit size value
+            fread(id, sizeof(BYTE), 4, fp); //read in 4 byte string now
+            if (!strcmp(id,"WAVE"))
+            { //this is probably a wave file since it contained "WAVE"
+                fread(id, sizeof(BYTE), 4, fp); //read in 4 bytes "fmt ";
+                fread(&format_length, sizeof(DWORD),1,fp);
+                fread(&format_tag, sizeof(short), 1, fp); //check mmreg.h (i think?) for other 
+                                                              // possible format tags like ADPCM
+                fread(&channels, sizeof(short),1,fp); //1 mono, 2 stereo
+                fread(&sample_rate, sizeof(DWORD), 1, fp); //like 44100, 22050, etc...
+                fread(&avg_bytes_sec, sizeof(short), 1, fp); //probably won't need this
+                fread(&block_align, sizeof(short), 1, fp); //probably won't need this
+                fread(&bits_per_sample, sizeof(short), 1, fp); //8 bit or 16 bit file?
+                fread(id, sizeof(BYTE), 4, fp); //read in 'data'
+                fread(&data_size, sizeof(DWORD), 1, fp); //how many bytes of sound data we have
+                sound_buffer = (BYTE *) malloc (sizeof(BYTE) * data_size); //set aside sound buffer space
+                fread(sound_buffer, sizeof(BYTE), data_size, fp); //read in our whole sound data chunk
+            }
+            else
+                printf("Error: RIFF file but not a wave file\n");
+        }
+        else
+            printf("Error: not a RIFF file\n");
+    }
+} There you go, it's as easy as that, there's probably a few errors in this code as I didn't have time to compile and test it, and you should probably do a bit more file error checking and other fancy things to make sure the data isn't corrupted and it looks ok. Once you have it loaded it's very simple to work with, you can manipulate your sound_buffer any way you need to or put it into a structure that windows applications like (look up WAVEFORMATEX in your compilers reference section). If your format_tag is something other than a 1 (1 means your data is stored in PCM or Pulse Code Modulation form) then you have some sort of compressed file, and in order to handle it you're going to have to know exactly how that data is compressed, and with so many formats out there (see mmreg.h I think? for a list of all the format tags) it's not practical that you're going to be able to handle all of them. Good luck... Disclaimer and Distribution Info   This file is Copyright 1998, Nathan Davidson You may NOT distribute this tutorial or put it up on your website without getting my permission first. All information is provided "as is" and the author assumes no responsibility for any damage caused by use of information in this tutorial. Use at your own risk.   If you want to see some other sound tutorials then head over to my web site, currently located at: http://www.aros.net/~npawn/ Reprinted with permission Comments OlliK May 14 2013 01:56 PM Hi,   Small typos in code (both in last and second to last code listing): 
+fread(&avg_bytes_sec, sizeof(short), 1, fp); //probably won't need this
+ should be:   
+fread(&avg_bytes_sec, sizeof(DWORD), 1, fp); //probably won't need this       And 
+fread(size, sizeof(DWORD), 1, fp); //read in 32bit size value
+ should be:   
+read(&size, sizeof(DWORD), 1, fp); //read in 32bit size value
+   (the same error exists in all nonpointer values in the second to last listing). Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Loading a Wave File English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

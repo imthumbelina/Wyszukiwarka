@@ -1,0 +1,227 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » General Programming » Article: Setting up a window Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Example of the Minimal Win32 & OpenGL program Example of Processing Mouse Events in OpenGL Understanding the Windows Aspect of DirectX Using the Windows Template Library Part 1: Getting Started Converting MS-DOS-based Games to Windows 95: A Report from the Trenches Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Setting up a window By Jesse King of MXF Entertainment | Published Jul 05 2000 09:23 AM in General Programming window hinstance windows return program title hwnd simple Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource updated: 2/12/00 Notes: This program creates a very simple window. It should look like a blank, white, with no title, no text, and default cursor/icons window. I set it up so that VK_ESCAPE (the escape button) will exit the window. I made this window because it give you a visual look at what you have created. I created it in VC++ 6.0 and I'm sure if I ran across a tutorial like this back when I was really new to windows programming it would help very much, I hope it help y'all. Good luck. //////////////////////////////////////
+// A Simple Window Tutorial
+
+////////////////////////////
+// By Jesse King
+// 11/13/99
+////////////
+
+/////////////
+// #includes
+// You will use this for all of your Windows applications
+#include <windows.h>
+
+////////////
+// #defines
+#ifndef  WIN32_LEAN_AND_MEAN  	// This cleans out rarely used stuff
+#define  WIN32_LEAN_AND_MEAN
+#endif
+#define  MAX_LOADSTRING  100 
+
+///////////////////
+// Global Variables
+HINSTANCE  	hInst;                           		// the Instance
+TCHAR      	szWindowClass[] = "I'M A TITLE!!!" ; 	// Title Bar
+
+//////////////////////////////////////////////////
+// Prototypes: beforehand declaration of functions
+ATOM            	MyRegisterClass(HINSTANCE hInstance);
+BOOL            	InitInstance(HINSTANCE, int);
+LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
+
+///////////////////////////////////////
+// WinMain() is what applies everthing
+int APIENTRY WinMain(HINSTANCE hInstance,
+  HINSTANCE hPrevInstance,
+  LPSTR lpCmdLine,
+  int nCmdShow)
+{
+   MSG msg;
+
+   /////////////////////////
+   // Set up the windows class
+   MyRegisterClass(hInstance);
+
+   /////////////////////////
+   // Create the window. If it doesn't work, return FALSE.
+   if (!InitInstance (hInstance, nCmdShow)) 
+  	return FALSE;
+
+   ////////////////////////
+   // This is a good place to use accelerations and whatnot,
+   // you should load them in the program from the resources (the whatever.rc)
+   ////////////////////////
+
+   ////////////////////////
+   // The main message loop is run under here,
+   // it pretty much explains itself. It just gets and handelse messages.
+   while (GetMessage(&msg, NULL, 0, 0)) 
+   {
+  	if (!TranslateAccelerator(msg.hwnd, 0, &msg)) 
+  	{
+ 		TranslateMessage(&msg);
+ 		DispatchMessage(&msg);
+  	}
+   }
+
+   return msg.wParam;
+}
+
+/////////////////////
+// the function MyRegisterClass()
+// this is used to create a WIN32 application,
+// if you have Microsoft Visual C++ and the documentation
+// it explains this really well. All the wc.xxxxxxx are variables in the
+// WNDCLASSEX structure, it took me a while to figure it out, just look at 
+// help files and tutorials, it's easier then it seems.
+ATOM MyRegisterClass(HINSTANCE hInstance)
+{
+   //////////////
+   // This allows you to use the structure
+   // WNDCLASSEX as wc.whatevervariable
+   WNDCLASSEX wc ;
+   wc.cbSize 		= sizeof(WNDCLASSEX) ;
+   //////////////
+   // Class Style described here.
+   wc.style    	= CS_HREDRAW | CS_VREDRAW ;
+   //////////////
+   // This is the functions that is called when a message is sent to the window (like a PAINT msg).
+   wc.lpfnWndProc    	= (WNDPROC)WndProc ;
+   ///////////////
+   // This is a simple window, so this isn't needed.
+   wc.cbClsExtra    	= 0 ;
+   ///////////////
+   // Same as above
+   wc.cbWndExtra    	= 0 ;
+   ///////////////
+   // The instance of the window.
+   wc.hInstance    	= hInstance ;
+   ///////////////
+   // A declaration of the icon, in the resources, or from file, but
+   // this one is from the resources.
+   wc.hIcon    	= 0 ;
+   ///////////////
+   // Loads the pointer, or cursor your window application will use
+   wc.hCursor    	= 0 ;
+   ///////////////
+   // The background color can change through color_window+whatever
+   wc.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1) ;
+   ///////////////
+   // Name of the menu system, but we don't have a menu here
+   // because this is a simple window.
+   wc.lpszMenuName	= 0 ;
+   ///////////////
+   // The title of the used windows classes, or
+   // the title of the program.
+   wc.lpszClassName	= szWindowClass ;
+   ///////////////
+   // This is the small icon, like when your windows options is to list all the
+   // icons, then it will display the small icons, this is the declaration of the 
+   // icon used for this occasion
+   wc.hIconSm    	= 0 ;
+
+   ///////////////
+   // This returns a registered structure,
+   // which is the windows classes, to the window.
+   return RegisterClassEx(&wc) ;
+}
+
+/////////////////////
+// the function InitInstance(HANDLE, int)
+// creates the main window or parent window, and 
+// describes the style (such as WS_OVERLAPPEDWINDOW, WS means 
+// Windows Style) and many other characteristics of the 
+// Parent Window.
+
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+{
+   HWND hWnd ;
+   hInst = hInstance ;          	// Store instance handle on global hInst
+   hWnd = CreateWindow( szWindowClass,
+                    	0, 
+                    	WS_OVERLAPPEDWINDOW,
+                    	CW_USEDEFAULT,
+                    	0, 
+                    	CW_USEDEFAULT, 
+                    	0, 
+                    	0, 
+                    	0, 
+                    	hInstance, 
+                    	0) ;
+
+   /////////////////////////
+   // If the window isn't made right
+   // it won't work...
+   if (!hWnd)
+   {
+  	return FALSE ;
+   }
+   //////////////////////////
+   // expains itself, nCmdShow 
+   // means that its a small window
+   // not maximized
+   ShowWindow(hWnd, nCmdShow) ;
+   UpdateWindow(hWnd) ;
+
+   return TRUE ;
+}
+
+////////////////////////////////////////////////////
+// The function WndProc(HWND, unsigned, WORD, LONG)
+// processes the window, it does whatever you want 
+// the window to do.
+//
+// WndProc()'s purpose is processing messages for the main window.
+//
+// ********************* BELOW ************************
+// 
+//
+// case**WM_MESSAGE	- Use the keyboard for the exiting the program,
+// I set it up as ESCAPE Exits the program (or VK_ESCAPE does).
+// 
+// case**WM_PAINT    	- Paints the main window, you can blit bitmaps
+// and such, but this is a simple window, so I painted it like
+// that
+//
+// case**WM_DESTROY	- Destroys the window when you push
+// the X on the upper right of the window
+////////////////////////////////////////////////////
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+   PAINTSTRUCT ps;
+   HDC     		hdc;
+    
+   LoadString(hInst, 0, 0, MAX_LOADSTRING) ;
+   //////////////////////////
+   // This is a nice simple loop
+   // that lets you input and get
+   // output to and from the window
+   switch (message) 
+   {
+  	case WM_KEYDOWN:
+ 		switch(wParam)
+ 		{
+        	case VK_ESCAPE:
+       		PostQuitMessage(0) ;
+       		break ;
+ 		}
+
+  	case WM_PAINT:
+ 		hdc = BeginPaint(hWnd, &ps) ;
+ 		RECT rt ;
+ 		GetClientRect(hWnd, &rt) ;
+ 		EndPaint(hWnd, &ps) ;
+ 		break ;
+
+  	case WM_DESTROY:
+ 		PostQuitMessage(1) ;
+ 		break ;
+
+  	default:
+ 		return DefWindowProc(hWnd, message, wParam, lParam) ;
+   }
+   ////////////////////////////////
+   // Return so it doesn't complain
+   return 0 ;
+} Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » General Programming » Article: Setting up a window English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

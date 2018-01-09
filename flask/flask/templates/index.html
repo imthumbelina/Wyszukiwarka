@@ -1,0 +1,15 @@
+{% from "_formhelpers.html" import render_field %}
+<html>
+<head>
+<title>WTForms</title>
+</head>
+<body>
+	<form method="POST" action="/">
+	   <dl>
+	    {{ form.csrf_token }}
+	    {{ render_field(form.query) }}
+	    <input type="submit" value="Search">
+	    </dl>
+	</form>
+</body>
+</html>

@@ -1,0 +1,109 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » DirectX and XNA » Article: 3D Sound with DirectX Audio Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Using DirectX Audio 8 Game Programming Genesis Part IV : Introduction to DirectX Game Programming Genesis Part X : Tips and Tricks Game Programming Genesis Part VI : Bitmapped Graphics in DirectDraw Game Programming Genesis Part I : Beginning Windows Programming Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike 3D Sound with DirectX Audio By Toby Murray | Published Feb 13 2003 12:33 PM in DirectX and XNA sound audiopath null segment play listener directx interface create Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource After spending months writing my first game using DirectX 8, I'd finally finished the graphics, AI, menus and everything else. One final element remained which I had been putting off since beginning the project: sound. Don't get me wrong; I love sound. Music and sound are what makes half of the gaming experience, the other half of course being the cool graphics. Having decided it was time to add sound I began digging through the SDK documentation and quickly realised that a few things had changed since I last looked at DirectSound. As DirectDraw and Direct3D had been combined to form DirectX Graphics, it seemed that DirectSound and DirectMusc had also been combined to form DirectX Audio. Feeling that it was time to get hip with DirectX Audio, I took a deep breath and jumped right in, and before long had a few classes together which nicely game me the 3D sound I wanted in my game. This tutorial gives a basic explanation of how to use DirectX Audio to create and play 3D sound effects loaded from .WAV files, and also includes the classes that I wrote to use in my game. Setting Up DirectX Audio Setting up DirectX Audio begins with creating a few DirectMusic interfaces. These interfaces include a DirectMusic Performance; which is used to play all the sounds and a DirectMusic Loader; which is used to load all the sounds. Having created these interfaces, DirectX Audio must be initialised using the InitAudio() method of the Perormance interface. The code to accomplish all this follows: // the performance and loader interfaces
+IDirectMusicPerformance8 *pPerformance = NULL;
+IDirectMusicLoader8 *pLoader = NULL;
+
+// Initialize COM
+CoInitialize(NULL);
+
+// Create loader interface
+CoCreateInstance(CLSID_DirectMusicLoader, NULL, CLSCTX_INPROC,
+             	IID_IDirectMusicLoader8, (void**)&pLoader );
+
+// Create performance interface
+CoCreateInstance(CLSID_DirectMusicPerformance, NULL, CLSCTX_INPROC,
+             	IID_IDirectMusicPerformance8, (void**)&pPerformance );
+ 
+// Initialise DirectX Audio for 3D sound
+pPerformance->InitAudio(NULL, NULL, NULL,
+                        DMUS_APATH_DYNAMIC_3D, 64,
+                        DMUS_AUDIOF_ALL, NULL ); First, all the COM stuff has to be setup with the call to CoInitialize(). Then using the COM function CoCreateInstance() we create the desired interfaces for our Performance and Loader. Finally DirectX Audio is initialised with a call to the InitAudio() method of the DirectMusic Performance interface. The parameters in this call indicate that we wish to setup DirectX Audio with a default 3D Audiopath, which is required for 3D sound. For more information on any of the above code, see the SDK documentation and the first DirectMusic tutorial. Creating a 3D Sound Now that we have DirectX Audio setup, we'd really like to be able to play something with it. This next section describes how to load and create a 3D sound using the previous interfaces. Strangely enough, to load a sound, we must use the DirectMusic Loader. The loader can be used to load a fair variety of sounds, however we shall be using it to load .WAV files. (If you want to load MP3 sounds then you'll have to use DirectShow, which isn't covered here.) When the Loader loads a sound, it is put into a DirectMusic Segment. A segment on its own is OK if you just want to be able to play a sound, however if you want to be able to alter the sound in any way (which you must do for 3D sound) then you have to give each segment its own Audiopath. The Audiopath is what the segment is played through, and by altering the Audiopath you alter the way in which a segment is played. For 3D sounds, each sound needs its own 3D Audiopath, which makes sense since it is a 3D sound. What makes a 3D Audiopaths special, and suitable for 3D sounds, is that they contain a 3D Sound Buffer. The 3D Sound Buffer can be altered to change the position of a sound in space, which is what you want for 3D Sound. This works fine if you are always listening to your sounds from the origin (0,0,0). However, if you are in a world where you are moving around, then you won't always be listening from the origin. To change where the 3D sound is heard from, you need a 3D Sound Listener which (suprisingly) 'listens' to the 3D Sound. Each 3D sound has its own listener, as the listener is associated with the 3D Audiopath. To create a 3D sound, we therefore have to load the sound into a segment. Create a 3D Audiopath for that segment. Get access to the 3D Sound Buffer contained in the Audiopath, and get access to the Listener which is also contained in the Audiopath. We can then play the sound, and alter its position in 3D space, as well as the position of the listener of the sound. The code to accomplish this follows: // points to a zero terminated wide character string specifying the
+// filename of the sound to load
+WCHAR *pwsFileName; 
+
+// the segment for our sound
+IDirectMusicSegment8 *pSegment = NULL;
+
+// the 3d audiopath for the sound
+IDirectMusicAudioPath8* p3DAudioPath = NULL;
+
+// the 3d sound buffer for the sound 
+IDirectSound3DBuffer8* pDSB = NULL;
+
+// the listener for the sound
+IDirectSound3DListener8* pListener = NULL;
+
+// load the soundfile into the segment
+pLoader->LoadObjectFromFile(CLSID_DirectMusicSegment,
+                            IID_IDirectMusicSegment8,
+                            pwsFileName,
+                            (LPVOID*) pSegment );
+   
+// Download the segment's instruments (this must be done for all .WAV files)
+pSegment->Download(pPerformance);
+
+// Create the 3D audiopath with a 3d buffer.
+// We can then play this segment through this audiopath (and hence the buffer)
+// and alter its 3D parameters.
+pPerformance->CreateStandardAudioPath(DMUS_APATH_DYNAMIC_3D, 
+                                      64, TRUE, &p3DAudioPath);
+
+// Get the 3D Sound Buffer from the 3D audiopath
+p3DAudioPath->GetObjectInPath(DMUS_PCHANNEL_ALL, DMUS_PATH_BUFFER, 0, 
+                              GUID_NULL, 0, IID_IDirectSound3DBuffer, 
+                              (LPVOID*) &pDSB);
+
+// get the listener from the 3d audiopath
+p3DAudioPath->GetObjectInPath(0, DMUS_PATH_PRIMARY_BUFFER,
+                              0, GUID_All_Objects, 0, 
+                              IID_IDirectSound3DListener,
+                              (void **)&pListener); The soundfile is loaded using the LoadObjectFromFile() method of the Loader interface. We indicate that we wish to create a DirectMusic Segment here and load the file specified in the wide character string. Next the instruments for the segment are downloaded. This step must be done for all .WAV samples before they can be played. Following this we create a 3D Audiopath for our sound, using the CreateStandardAudioPath() method of the Performance interface. We indicate that we want a 3D audiopath and that it should be activated upon creation. We then use the GetObjectInPath() method of the Audiopath interface to request an interface pointer to the 3D Sound Buffer and the 3D Listener. Having achieved this, our sound is ready to be positioned, and played in 3D Space. Positioning the Sound and Listener To position the sound or the listener, we must call the SetPosition()method of the appropriate interface. To position the sound, we call the method on the 3D Sound Buffer interface. To position the listener, we call the method on the (yep you guessed it) Listener interface. The following code positions the sound and the llistener. // the following store the coordinates of the sound and the listener.
+float fSoundPosX, fSoundPosY, fSoundPosZ;
+float fListenerPosX, fListenerPosY, fListenerPosZ;
+
+// Set the position of sound
+pDSB->SetPosition( fSoundPosX, fSoundPosY, fSoundPosZ, DS3D_IMMEDIATE);
+
+// Set the position of the listener
+pListener->SetPosition(fListenerPosX, fListenerPosY, fListenerPosZ, DS3D_IMMEDIATE); The DS3D_IMMEDIATE flag in the above calls indicate that we want the change to occur as soon as possible. Righto, are we ready to hear these sounds or what? Playing The Sound The sound itself is played using the DirectMusic Performance interface, where we specify which segment to play and the Audiopath we wish to play it through. We want to play our segment through its own audiopath, so that the changes that we made with the above code (where we moved the sound and its listener) actually take effect. The code to play the sound follows: // play the segment on the 3D audiopath - play it as a secondary
+// segment so that we can play multiple sounds at once.
+pPerformance->PlaySegmentEx(pSegment, NULL, NULL, DMUS_SEGF_SECONDARY,
+                            0, NULL, NULL, p3DAudioPath ); The DMUS_SEGF_SECONDARY flag is used to indicate that we wish this segment to be played as a secondary segment. This allows us to play more than one sound at a time. So now you can load a sound, set its 3D parameters and play it. All that's left now is to show you how to clean up after yourself. Cleanup and Housekeeping You should always clean up your mess, so here's the code to do that. // release the 3d sound buffer
+if (pDSB)
+   pDSB->Release();
+pDSB = NULL;
+
+// release the listener
+if (pListener)
+   pListener->Release();
+pListener = NULL;
+
+// release the 3d audiopath
+if (p3DAudioPath)
+   p3DAudioPath->Release();
+p3DAudioPath = NULL;
+
+// release the segment
+if (pSegment)   	
+   pSegment->Release();
+pSegment = NULL;
+
+// release the loader
+if (pLoader)
+   pLoader->Release();
+pLoader = NULL;
+
+// finally close down the performance, and release it
+if (pPerformance)
+   pPerformance->CloseDown();
+
+if (pPerformance)
+   pPerformance->Release();
+pPerformance = NULL;
+
+// close down COM
+CoUninitialize(); Each interface must be released in the reverse of the order that they were created in. Before we release our Performance it must first be closed down using its CloseDown() method. Finally COM must be closed down, using the standard CoUninitialize() call. One thing I haven't mentioned so far is what you'll have to link your project with and the files you need to include to get all this working. You'll have to link with dxguid.lib and include the following precompiler directives: // the following need to be included - also link with dxguid.lib
+#define INITGUID
+#include <windows.h>
+#include <dmusicc.h>
+#include <dmusici.h>
+#include <cguid.h> And that's all folks... For more information on everything here see the SDK and the first two DirectMusic tutorials. Also I haven't done any error testing in the above code, however this should always be done - I've just left it out to increase readability. One last thing before I go - I've made a couple classes: One (CDXAudio) to do the DirectX Audio initialisation and shutdown, and another (C3DSound) used to create and destroy 3d sounds, position them and their listener in space and then play them. They are used in the project source, which is an application that creates a sound and plays it in various locations. Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » DirectX and XNA » Article: 3D Sound with DirectX Audio English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

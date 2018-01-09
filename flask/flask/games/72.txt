@@ -1,0 +1,225 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: SDL & Fonts Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This SDL & Fonts Part 2: PrintStrings The Simple DirectMedia Layer from a WIN32 Perspective, Part 2: SDL Video Game Programming: Snake Radiosity Methods Starting Direct3D9: Setting Up a Window Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike SDL & Fonts By Doug Manley | Published Jun 09 2003 01:33 PM in Game Programming clr int sdl_color sdl_ttf sdl ttf_font #include font Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource SDL & Fonts by Doug Manley To start off, I'm assuming that you've read Ernest Pazera's introduction-and-setup articles about SDL (well, not really, since I haven't read them... but you get the idea). I just want you to have the most basic background possible. Prerequisites: You can compile an SDL program. Party Time Doug Manley's Directory Structure: C++\Programs\<Program Name>\ This is the folder with my current program's files. C++\SDL\SDL Dump\DLL C++\SDL\SDL Dump\Include C++\SDL\SDL Dump\Lib These are my three "dump" folders for SDL. Basically, if I get a new SDL library, all of its little components go in one of these. DLL's go in "DLL," H's go in "Include," and LIB's go in "Lib." In the options in VisualC (Tools-->Options-->Directories), there is an option that lets you add some paths. I add my "SDL Dump\Include" path to the other Include paths for every project (Do the same with the LIB). Also, I'm pretty sure that in VisualC, you need to manually add the LIB files to your project. Remember, copy the DLLs that you'll need for your program into the directory with your program's executable file. Introduction: When I first started using SDL, I was really enthusiastic. It had such an easy interface, as opposed to the 3\/1L that is DirectX. But then I learned that there were a few drawbacks: Writing getpixel() & putpixel() Only being able to draw rectangles No text output what-so-ever In order to get these things, you need to get some libraries (they're on www.libsdl.org under "libraries"). Anyway, the object of this article is on the third-and most important to me-Text Output. SDL & Fonts: When I was looking for an "easy" way to write text to the screen, a lot of Internet answers said, "Oh, just write your own font engine." I didn't want to write my own font engine, but the nameless Internet gurus couldn't hear me cursing at my monitor. Option two pointed me to BFont++ and SFont. Well, let's just say "no" to those. They require those little PNG fonts that you would expect to see from SEGA. No, that's still "work" in my book. Finally, we have option three: SDL_TTF. SDL_TTF: SDL_TTF is short for, believe it or not, "Simple DirectMedia TrueType Font," or something like that. The whole point behind SDL_TTF is that you can use TTF format fonts, which is really great. The problem is setting it all up (at least for a Windows loser like myself, who is too lazy to use Linux). SDL_TTF is a "wrapper" for FreeType. Basically, FreeType is impossibly difficult to use, so Sam was nice enough to write a wrapper library that makes it really easy to use. Please Work, Mr. SDL_TTF... Okay, so to get this project rolling, we need to do a few things: Step 1: Go to "http://www.libsdl.org/projects/SDL_ttf/". Step 2: Get the binary that works with your system. For me, it is the one under Windows that ends with VC6 (for VisualC), because Borland wouldn't work for me, and I was too lazy to get a cheap command-line compiler. Step 3: Unzip it and do whatever you have to do for it to work. For me, this meant finding the .LIB files, the .H files, and the .DLL files and putting them in my three big folders of LIB's, H's, and DLL's. (That wasn't too bad, was it? Now, we need to get one more thing: FreeType 2. Okay, I'll be honest. It says to get FreeType. For Windows VisualC users, I don't think that you need to do the rest of this. I think that the nice guys who make the DLLs and stuff for us build this stuff in. But, like I said, I'm not sure.) Only if you need to: Step 4: Head to "http://www.freetype.org". Step 5: Enter the page (USA or Europe). Your objective is to download FreeType 2. Over on the right is "Download." Go there, and look for "stable releases." Follow links until they decide that you will not be stopped by pointless links to other pointless links. That lead my to a magical page, "http://sourceforge.net/project/showfiles.php?group_id=3157". Anyway, find version 2 and get the latest one that they say is "stable." Step 6: Download the beast. Step 7: Do your thing to make it work. Again, for me, this meant copying all the DLL, H, and LIB files into my "SDL Dump" folder. All right, we physically have everything now. Compile, Mr. SDL_TTF... So, now we need to add these to our program. For you Linux guys out there, you're on your own. You should know how to make this work, since it isn't half as hard as this. Make a new project. Do whatever Ernest Pazera says to do to make an SDL project work. Personally, I just throw some #include statements in there and see how many errors I get. (From there, I justgo to "Settings-->Project" and play until they all go away. You know, the "Multi-threaded DLL" thing...) Add SDL_TTF.LIB to your project. Now, we can start writing some code: 
+
+#include <stdio.h>
+
+#include <stdlib.h>
+
+#include <string>
+
+#include <vector>
+
+#include <time.h>
+
+
+
+#include <SDL.h>   // All SDL App's need this
+
+#include <SDL_TTF.h> // It's our new buddy!!
+
+
+
+int main( int argc, char* argv[] ) {
+
+   /* Initialize defaults, Video and Audio */
+
+   if( SDL_Init(SDL_INIT_VIDEO)==(-1) ) { 
+
+      printf("Could not initialize SDL: %s.\n", SDL_GetError());
+
+      exit(-1);
+
+   }
+
+
+
+   /* Set up the video */
+
+   SDL_Surface *screen;
+
+   int WINWIDTH = 640, WINHEIGHT = 480, BPP = 32;
+
+   screen = SDL_SetVideoMode( WINWIDTH,WINHEIGHT, BPP, SDL_SWSURFACE );
+
+   if( screen == NULL ) {
+
+        fprintf(stderr, "Couldn't set %ix%ix%i video mode: %s\n", WINWIDTH,WINHEIGHT,BPP, SDL_GetError());
+
+        exit(1);
+
+   }
+
+   atexit(SDL_Quit);
+
+   SDL_ShowCursor( SDL_DISABLE ); // The cursor is ugly :)
+
+
+
+   /* Set up the SDL_TTF */
+
+   TTF_Init();
+
+      atexit(TTF_Quit);
+
+   /* TTF_Init() is like SDL_Init(), but with no parameters.  Basically, it initializes
+
+      SDL_TTF.  There's really not much to it.  Remember, when the program ends, we have
+
+      to call TTF_Quit().  atexit(TTF_Quit) ensures that when we call exit(), the
+
+      program calls TTF_Quit() for us. */
+
+   
+
+   exit(0);
+
+}
+
+ This is all basic SDL. This has nothing at all to do with SDL_TTF (but it does ensure that it won't compile unless the H file is present and the libraries are there). Now, for the fun part. The basic structure in SDL_TTF is the TTF_Font. You use this to store a font that you open (kind of like an SDL_Surface for fonts). First, we need a font. Go to "Windows\Fonts" or wherever and grab a few fonts. I like Courier myself. I find it easier to make a "Fonts" directory and copy them there. For this article, I took "cour.ttf" and "arial.ttf" and copied them to the "Fonts" directory. C++\Programs\<Program Name>\ This is where all the code is. C++\Programs\<Program Name>\Debug\ This is where the EXE is. C++\Programs\<Program Name>\Debug\Fonts\ This is where "cour.ttf" and "arial.ttf" are. Just like an SDL_Surface has SDL_LoadBMP(), a TTF_Font has TTF_OpenFont(). 
+
+TTF_Font *font = TTF_OpenFont( <Font Filename>, <Pointsize> );
+
+ <Filename> is the filename (surprise!). To load Courier, this would be "fonts\\cour.ttf". <Pointsize> is (drum roll) the pointsize of the font. Remember, a "point" is 1/72 of an inch for some stupid reason. I'm sure this will be in no way useful, since pixels don't really have a specific size. Like SDL_FreeSurface(), we have to free up our font when we are done with it. The function for that is TTF_CloseFont(). So, to safely make a Courier font to use, we could do this: 
+
+TTF_Font *fntCourier = TTF_OpenFont( "Fonts\\cour.ttf", 12 );
+
+   /* We'll do something here later. */
+
+TTF_CloseFont( fntCourier );
+
+ Yay. Now that we have a TTF_Font*, we can actually do something with it: 
+
+/* ...(We'll do something here later.) */
+
+SDL_Color clrFg = {0,0,255,0};  // Blue ("Fg" is foreground)
+
+SDL_Surface *sText = TTF_RenderText_Solid( fntCourier, "Courier 12", clrFg );
+
+   SDL_Rect rcDest = {0,0,0,0};
+
+   SDL_BlitSurface( sText,NULL, screen,&rcDest );
+
+SDL_FreeSurface( sText );
+
+ This prints "Courier 12" to the upper left corner of the screen. That was pretty easy. Now, let's look at rendering: 
+
+TTF_RenderText_Solid(
+
+   TTF_Font *font, // This is the TTF_Font to use.
+
+   char *cstr, // This is the text to render.
+
+   SDL_Color &clr, // This is the color to use.
+
+);
+
+ TTF_RenderText_Solid() makes an SDL_Surface* that you can blit to the screen (or anything else). It is transparent, so that's nice. Also, 
+
+TTF_RenderText_Blended(
+
+   TTF_Font *font, // This is the TTF_Font to use.
+
+   char *cstr, // This is the text to render.
+
+   SDL_Color &clr, // This is the color to use.
+
+);
+
+ TTF_RenderText_Blended() just makes it look prettier by (more or less) darkening the edges of the text. I'm pretty sure that it uses alpha blending, if you care. And, 
+
+TTF_RenderText_Shaded(
+
+   TTF_Font *font, // This is the TTF_Font to use.
+
+   char *cstr, // This is the text to render.
+
+   SDL_Color &clrFg, // Foreground color to use.
+
+   SDL_Color &clrBg, // Background color to use.
+
+);
+
+ TTF_RenderText_Shaded() is the only one of the three that actually puts a background in for you. The result of this looks the same as blitting "code">TTF_RenderText_Blended() onto a rectangle of color clrBg. Very Important (Ooo, Aaa) Before we move on, I can't bear to tolerate SDL's lack of useful functions. So, I recommend making stuff like this (and sticking it in a header somewhere). 
+
+/* Make an SDL_Rect without manually setting each value one at a time */
+
+SDL_Rect newSDL_Rect( int xs,int ys, int dx,int dy ) {
+
+        SDL_Rect rc;
+
+                rc.x = xs; rc.y = ys;
+
+                rc.w = dx; rc.h = dy;
+
+        return( rc );
+
+}
+
+/* Make a new SDL_Color */
+
+SDL_Color newSDL_Color( int r, int g, int b, int a ) {
+
+        SDL_Color clr;
+
+                clr.r = r;
+
+                clr.g = g;
+
+                clr.b = b;
+
+                clr.unused = a;
+
+        return( clr );
+
+}
+
+/* Who needs alpha anyway? */
+
+SDL_Color newSDL_Color( int r, int g, int b ) {
+
+        SDL_Color clr;
+
+                clr.r = r;
+
+                clr.g = g;
+
+                clr.b = b;
+
+                clr.unused = 0;
+
+        return( clr );
+
+}
+
+/* operators are fun */
+
+bool operator==(SDL_Color a, SDL_Color b) {
+
+        return( a.r == b.r && a.g == b.g && a.b == b.b );
+
+}
+
+bool operator!=(SDL_Color a, SDL_Color b) {
+
+        return( ( a.r != b.r || a.g != b.g || a.b != b.b ) );
+
+}
+
+/* It's faster to type this way */
+
+int SDL_MapRGB( SDL_PixelFormat *format, SDL_Color clr ) {
+
+        return( SDL_MapRGB( format, clr.r, clr.g, clr.b ) );
+
+}
+
+/* Same here */
+
+int SDL_FillRect( SDL_Surface *dest, SDL_Rect *rc, SDL_Color &clr ) {
+
+        if( dest == NULL ) {  return(-1);  }
+
+        return( SDL_FillRect( dest, rc, SDL_MapRGB( dest->format, clr ) ) );
+
+}
+
+ I feel better now. Well, that was pretty long, but I think that it covered what it had to. The only real problem with SDL_TTF is that it can't handle more than one line of test. Next time, I'll show you a nice way to fix this and wrap the wrapper and make a function called...<bum bum buuum>... PrintStrings(). Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: SDL & Fonts English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

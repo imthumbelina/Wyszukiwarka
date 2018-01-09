@@ -1,0 +1,145 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Multiplayer and Network Programming » Article: Advanced WinSock Multiplayer Game Programming: Multicasting Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This WinSock2 for Games The Internet, A Summary Introduction to TCP/IP, and Losing Underwear The Essentials of Multiplayer Games Pentium Secrets Knowing the Path Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Advanced WinSock Multiplayer Game Programming: Multicasting By Denis Lukianov | Published Nov 08 2001 07:10 PM in Multiplayer and Network Programming data group packets game network server Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource Combating lag is a major problem in multiplayer network game development. As multiplayer game developers, we always strive to make things faster, leaner and meaner to reduce lag and free up bandwidth. This is why we often forsake the reliability of TCP for the speed that UDP provides. Multicasting is yet another step in the fight against latency, carrying many promises, including the transmission of very high quality streaming digital TV over networks and in the future, the Internet. What is the magic behind multicasting and how can it be used in our games? In short, it can not only reduce server workload but is also a solution to the age old problem of players finding each other on networks without the game developer having to put up dedicated master servers, but more on that later. Oh, and if DirectPlay uses multicasting extensively, then it's all more the reason for us to use it . The Idea Behind Multicasting The theory goes something like this. In the most commonly used networking client-server model, when a client sends input to the server, this input updates the game state and then the server tells all the other clients about what has happened by sending the same information to all the clients: As you can see there is a traffic problem on the server's network connection. If, say, there were 32 players connected to the server at the time, then the same information would be sent 32 times (once to each player). If there were 20 bytes of data to be sent to each of the 32 players then 640 bytes would have to be sent through the server's network connection. If that were to happen every time any of the 32 players pressed a key or moved the mouse, a huge amount of traffic is generated. Naturally, there is no replacement for good coding practice and sending only the data that is needed, but multicasting can seriously help. So how can multicasting help? Well, Multicasting can dramatically reduce the amount of data that needs to be sent by taking the task of packet replication away from the game server to the actual network infrastructure. In multicasting, packets can be sent to groups of network addresses, instead of individual addresses. This is similar to the way email works - when we want to send the same email message to multiple email addresses, we don't send the message to every address from our computer. Instead we send the message once, telling the server to replicate the message to all the other addresses. The Darker Side Of course, there are reasons why multicasting is not commonly used: Some ISPs and networks don't support multicasting yet. Bastards. So if you want to implement multicasting in a game, you're better off adding it as an option. Internet multicasting is rarely supported, but hopefully it will be in the future. Multicasting only makes a worthwhile gain in performance when network data is replicated, realistically only worth bothering when there is support for more than four players. Multicasting requires some more coding and programmers are lazy to even look into it. As you will see, in fact it requires very little additional code. The corporate "Quality Digital TV via Multicasting" idea seems to put game programmers off the subject altogether, I suspect it has something to do with hacker ethics, so long live the .org's! The openness of multicast groups may make your packets easier to sniff. Usually UDP packets can only be intercepted between their source and destination, but now they can be captured anywhere on the network; by joining the right group, anyone can get a carbon-copy!How Multicasting Works You may have heard of broadcasting. Broadcasting forwards data to every address on the network. Unlike broadcasting, multicasting only forwards to those addresses who have explicitly registered interest in the data. On an IP network supporting multicasting there are such things as multicast groups. If you want to receive multicast data packets, you must join a multicast group. Although it should be possible to send data packets to a multicast group regardless of membership, it is often better to join a group before sending to it for reasons I won't venture into. If you are a member of a group to which you are sending multicast data packets, you will receive a copy of the data packets. Also, a client will not receive all data packets from a multicast group, but only those which are sent to the port that the socket is bound to. So a sensible idea would be for all the game clients to join a multicast group and wait for data on the same port. Then the server, by sending a single packet of data to that multicast group, would be sending to all the clients as the packets are replicated somewhere along the way. We've seen the light, we've seen the darkness, so let us onto the code... Joining a Multicast Group and Receiving Multicast Data Packets To receive multicast packets sent to a multicast group, your game will need to join or become a member of that multicast group. To request becoming a member of a multicast group is a lot simpler than you may at first imagine. You need to first bind() your UDP socket to a local port (elementary, my dear friend): SOCKADDR_IN addrLocal;
+// We want to use the Internet address family
+addrLocal.sin_family = AF_INET;
+// Use any local address
+addrLocal.sin_addr.s_addr = INADDR_ANY;
+// Use arbitrary port - but the same as on other clients/servers
+addrLocal.sin_port = htons(uiPort); 
+// Bind socket to our address
+if(SOCKET_ERROR == bind(hUDPSocket, (LPSOCKADDR)&addrLocal, 
+                        sizeof(struct sockaddr)))
+  {cout << "Euston, we have a problem";}
+// Ready to switch to multicasting mode[code]And then just make a call to [i]setsockopt()[/i], and here's a prototype for your convenience *grin*:
+
+[code]int WSAAPI setsockopt(SOCKET s, int level, int optname,
+                      const char FAR * optval, int optlen);[/code]If you thought you were getting away with just 1 new line of code to learn, you were wrong... you're only getting away with 4 new lines =). There are special parameters to prepare for this call: [i]s[/i] is your socket handle, [i]level[/i] should be set to [i]IPPROTO_IP[/i], optname should be set to [i]IP_ADD_MEMBERSHIP[/i] and a pointer to the [i]p_mreq[/i] structure passed as [i]optval[/i], with its length in [i]optlen[/i]. This is what the [i]p_mreq[/i] structure looks like:
+
+ [indent][code]struct ip_mreq {
+  struct in_addr imr_multiaddr;   /* multicast group to join */
+  struct in_addr imr_interface;   /* interface to join on    */
+}[/code][/indent] It has 2 fields, both of them are [i]in_add[/i] r structures: [i]imr_multiaddr[/i] specifies the address of the multicast group to join and [i]imr_interface[/i] specifies the local address [i]INADDR_ANY[/i].
+
+ There are special (Class 'D') addresses allocated for multicast groups. These are in the range from 224.0.1.0 to 239.255.255.255. You can choose an address from the range as the target multicast group to join, and set the [i]imr_multiaddr[/i] to this address. The full [i]setsockopt()[/i] call would look something like this:
+
+ [indent][code]struct ip_mreq mreq;
+mreq.imr_multiaddr.s_addr = inet_addr("234.5.6.7");
+mreq.imr_interface.s_addr = INADDR_ANY;
+nRet = setsockopt(hUDPSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                  (char*)&mreq, sizeof(mreq));[/code][/indent] And that's all there is to it, apart from a lot of error checking which I've decided to leave out for clarity (aka Laziness). The socket will now receive data packets sent to the multicast group on the specified port with calls to [i]recvfrom()[/i]:
+
+ [indent][code]SOCKADDR_IN addrSrc;
+nRet = recvfrom(hUDPSocket, (char *)&Data, sizeof(Data), 0,
+                (struct sockaddr*)&addrSrc, sizeof(addrSrc));[/code][/indent] When you're finished with the group and want to leave, just repeat the call with identical parameters apart from [i]IP_ADD_MEMBERSHIP[/i] which should be replaced with [i]IP_DROP_MEMBERSHIP[/i].
+
+ [indent][code]nRet = setsockopt(hUDPSocket, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+                  (char*)&mreq, sizeof(mreq));[/code][/indent] Now that we can join a multicast group and receive packets sent to it, the logical thing to do is to learn how to send packets to a multicast group.
+
+ 
+[size="5"][b]Sending Multicast Data Packets[/b][/size]
+
+Sending multicast data packets is accomplished with a call to [i]sendto()[/i], specifying a multicast group address as the destination IP address and the wanted port (on which your clients are tuned to listen for data). So there really a lot to learn apart from using the TTL (Time To Live) socket option.
+
+ All IP packets carry a TTL value to make sure that they are discarded if they don't reach a destination so they don't clog up the network. In a multicast data packet, TTL specifies how far a multicast data packet can travel:
+
+<table border="1" cellpadding="3" cellspacing="0"  width="100%"><tbody><tr><td class="tblhdr">[size="3"][b]TTL  Threshold[/b][/size]</td><td  class="tblhdr">[b][size="3"]Description[/size][/b]</td></tr><tr><td>TTL  equal to 0</td><td>Restricted to the same  host</td></tr><tr><td>TTL equal to  1</td><td>Restricted to the same  subnet</td></tr><tr><td>TTL equal to  32</td><td>Restricted to the same  site</td></tr><tr><td>TTL equal to  64</td><td>Restricted to the same  region</td></tr><tr><td>TTL equal to  128</td><td>Restricted to the same  continent</td></tr><tr><td>TTL equal to  255</td><td>Unrestricted in  scope</td></tr></tbody></table>  					[From MSDN, this is very rough and should not be taken literally] 
+
+Multicasting is nowhere as dangerous as broadcasting in terms of unwanted traffic that it can produce but caution is advised when using some of the higher TTL values.
+
+ To set a socket's multicast TTL value, [i]setsockopt()[/i] can be used with [i]IPPROTO_IP[/i] as the protocol level and [i]IP_MULTICAST_TTL[/i] as the socket option.
+
+ [indent][code]char TTL = 32 ; // Restrict to our school network, for example
+setsockopt(hUDPSocket, IPPROTO_IP, IP_MULTICAST_TTL,
+   		(char *)&TTL, sizeof(TTL));[/code][/indent] We must also tell the system exactly which local network interface we would like to multicast on.
+
+ [indent][code]// Set the local interface from which multicast is to be transmitted
+unsigned long addr = inet_addr(YOUR_IP_ADDRESS_STRING);
+setsockopt(sSocket, IPPROTO_IP, IP_MULTICAST_IF, (char *)&addr,
+sizeof(addr));[/code][/indent] Once the TTL and multicast interface are set, just [i]sendto()[/i] away:
+
+ [indent][code]SOCKADDR_IN  addrDest;
+szHi[50];
+
+addrDest.sin_family = AF_INET;
+// Target multicast group address
+addrDest.sin_addr.s_addr = inet_addr("234.5.6.7");
+// Port on which client is set to receive data packets
+addrDest.sin_port = htons(uiPort);
+// Something unoriginal to send
+strcpy(szHi,"Hello Multicast Group!");
+
+nRet = sendto(hUDPSocket, (char *)szHi, strlen(szHi), 0,
+              (struct sockaddr*)&addrDest, sizeof(addrDest));[/code][/indent] We can now join multicast groups, send and receive data from them, but how do we implement multicasting as an option in our game and what would we use it for?
+
+ 
+[size="5"][b]Uses of Multicasting in Games[/b][/size]
+
+I can think of two ways straight away - one is to use it for reducing (maybe even eliminating) the amount of repeated data that a server has to send out, but another interesting use is a global server-less interface for finding other players on the network.
+
+ The scenario: there are 2 people on a large network running the same game that want to play together, but they don't know each other's IP addresses let alone the fact that the potential opponent exists. The common ways for connecting the 2 players:
+ [list][*]The players send out a broadcast message to the entire network, however this would create huge traffic and will probably be restricted to sub networks. Broadcasting on the Internet would create an enormous amount of traffic, so it is not allowed.[*]The players connect to an intermediate, "known" master server IP, which tells them of each other's existence. These servers are costly to run and their uptime is often undependable.[*]The players go to a chatroom hoping to find other players and play together. This will not connect all the players as some may be in different chatrooms. And the process of finding someone may take a while.[/list] So here we are with an age old problem (how A finds B) on one hand and multicasting on the other. Multicasting groups always have the same address - a "known" address as in the case of a dedicated server, they are online 100% of the time - unlimited uptime, they don't cost anything to connect to or send information across. All game clients simply connects to a multicast group, multicast an "I want to play" message and the servers can then advertise their availability directly (instead of broadcasting, to save bandwidth) to the clients who are members of the multicast group.
+
+ Sure, there are itsy-bitsy technical problems to sort out, but the idea is cool enough. And the TTL control allows us to query within a certain range of routers (see TTL table) so we can specifically only ask to send to our LAN, or a university network, or all servers within our country to respond. Don't you think that is COOL? I sure do.
+
+ The only problem (see "The Dark Side") remains multicast support by ISP's and networks. So the best way to add multicasting to a game is still as an option (although I hope and pray that multicasting will be 100% supported in the future). But how do we integrate multicasting into our game as an option?
+
+ 
+[size="5"][b]Integrating Multicasting into Games[/b][/size]
+
+Ok then, where do we start? There are so many different types of multiplayer games that I won't even try to explain how to integrate multicasting into different types of games. Instead I'll just give a few possible ideas of solutions in a client-server relationship.
+
+ First of all, all the current network code should be kept as it is, when you add multicast support make sure you do not remove any existing code unless you really think it is necessary.
+
+ When adding multicast support, you can either do a parallel integration where multicasting runs along with existing code, or you could write two separate sets of network code and add a 'multicast on/off switch' for the user. The on/off switch would isolate servers using the other network code and add one more daunting and mysterious switch for the average newbie to get wrong. Parallel integration (bah, the things I learned in school last year) is my favorite as it will use multicasting only if it is supported and should be transparent to the user.
+
+ So let’s stick with parallel integration - in this case the normal network code runs always, but the multicasting code only runs if multicasting is supported. How do we determine if multicasting is supported? Just read the error [i]setsockopt()[/i] gives us when trying to join a group:
+
+ [indent][code]nRet = setsockopt(hUDPSocket, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+                  (char*)&mreq, sizeof(mreq));
+if(WSAESOCKTNOSUPPORT == nRet)
+  {
+  // Multicasting not supported. Damn.
+  }[/code][/indent] The client-server relationship is a game of two halves. So what if the server supports multicasting while the client does not? How does the server know which clients are covered with a single send to the multicast group and which are not? The client first determines that it does not support multicasting, then connects to the server and tells the server whether it supports multicasting. The server usually keeps a list or array of clients, to which it is easy to add an extra boolean flag:
+
+ [indent][code]struct Client
+  {
+  SOCKADDR_IN addrRemote;
+  /* ... Game specific info here ...*/
+  BOOL bSupportMulticast;
+  }[/code][/indent] The server's function to send data sends a multicast to clients who support multicasting and normal UDP datagrams to those that do not. If, however, the server itself does not support multicasting then we must use the old method. Here's a useful code snippet for a server with multicasting as an option:
+
+ [indent][code]int SendToAll(char *Data)
+  {
+  if(bServerSupportMulticast)
+    {
+    // First send multicast, then send individually
+    // to those who don't support it
+    for(int index = 0; index < MAX_CLIENTS; index++)
+    {
+      if(Clients[index].Exist && Clients[index].bSupportMulticast)
+      {
+        // At least one client supports multicasting, so use it
+        SendMulticast(Data, addrMulticast);
+        break;
+      }
+    }
+    for(int index = 0; index < MAX_CLIENTS; index++)
+      {
+      if(Clients[index].Exist && !Clients[index].bSupportMulticast)
+        {
+        OldSendToClient(Data, Clients[index].addrRemote);
+        }
+      }
+    }
+  else
+    {
+    // Use the old method all the way regardless of support
+    // as we ourselves don't support it
+    for(int index = 0; index < MAX_CLIENTS; index++)
+      {
+      if(Clients[index].Exist)
+        {
+        OldSendToClient(Data, Clients[index].addrRemote);
+        }
+      }
+    }
+  } I hope I've shed some light on multicasting and its possible uses in games. If you've found this article the least bit interesting or have a problem, drop an email to denis@voxelsoft.com. I hope to write another article soon, but for now, Happy Multicasting! - Denis "Voxel" Lukianov Thanks to Jan "Riva" Halfar for the wonderful diagrams. Download attached article resource Comments NickWiggill Dec 17 2011 01:29 PM So, ten years since this article was written. What's the status of UDP multicast support? Still not something that its possible to take for granted, I guess. Mussi Dec 20 2011 06:11 AM I wonder as well, does anyone know? Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Multiplayer and Network Programming » Article: Advanced WinSock Multiplayer Game Programming: Multicasting English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

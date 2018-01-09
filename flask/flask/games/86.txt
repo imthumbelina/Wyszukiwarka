@@ -1,0 +1,318 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » DirectX and XNA » Article: Playing MIDIs and WAVs using DirectX Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Using DirectX Audio 8 Example of the Minimal Win32 & OpenGL program Example of Processing Mouse Events in OpenGL Game Programming Genesis Part III : Tracking Your Window and Using GDI Setting up a window Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Playing MIDIs and WAVs using DirectX By Stephen Johnson | Published Apr 17 2003 07:01 PM in DirectX and XNA null window mainwindow #define handle stop segment #include end Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource I'll keep this short and simple. I assume you already know how to start a windows program and at least make a message box so the program doesn't just start and end, but I'll provide windows code as well as DirectSound. How This Tutorial is Written Not very detailed. I give you the code, where to put it, what you should care about, then let you write your own wrappers or use the DX documentation to figure out the rest. (or the comments in the source) Setting Up Set the linker to link to dsound.lib, #define INITGUID at the beginning and #include <dmusici.h> For later, add #define DXDELETE(p) if(p) p->Release(); or something similar to shorten coding. Also, add these as globals: IDirectMusicLoader8*      g_pLoader   	= NULL;
+IDirectMusicPerformance8* g_pPerformance  = NULL;
+IDirectMusicSegment8* 	g_pSegment      = NULL; Each has their own reason, way to be wrapped, explanation, etc... but I know that you wanna know how to do it, and if you wanna learn why you'd read the documentation. Just make sure the above is there, what you are able to change comes later. The Basic Setup First thing in WinMain, put this: //DMusic and COM setup
+CoInitialize(NULL);
+    
+CoCreateInstance(CLSID_DirectMusicLoader, NULL, 
+             	CLSCTX_INPROC, IID_IDirectMusicLoader8,
+             	(void**)&g_pLoader);
+
+CoCreateInstance(CLSID_DirectMusicPerformance, NULL,
+             	CLSCTX_INPROC, IID_IDirectMusicPerformance8,
+             	(void**)&g_pPerformance );
+// end of COM and DMusic setup You need to CoInitialize now and CoUninitialize later. You can put this anywhere in WinMain, I'm guessing, as long as it's before all the other DirectSound code. I suggest writing a wrapper to do this. (I have not written any wrappers successfully yet, although I know how now, so don't ask me). Now, put this somewhere after the above: // init audio
+g_pPerformance->InitAudio( 
+   NULL,                  // IDirectMusic interface not needed.
+   NULL,                  // IDirectSound interface not needed.
+   hwnd,                  // Window handle.
+   DMUS_APATH_SHARED_STEREOPLUSREVERB,  // Default audiopath type.
+   64,                    // Number of performance channels.
+   DMUS_AUDIOF_ALL,   	// Features on synthesizer.
+   NULL               	// Audio parameters; use defaults.
+);
+// end init audio Above, change hwnd to whatever you made your window handle's name to be. What You Change The next set of code, I'll actually explain a bit: // Set the search directory.
+g_pLoader->SetSearchDirectory( 
+    GUID_DirectMusicAllTypes,   // Types of files sought.
+    /*L"C:\\Program Files\\KaZaA\\My Shared Folder"*/ NULL, // Where to look. Null for default
+    FALSE                   	// Don't clear object data.
+); // This function has a lot of stuff I did to it, explained below
+
+WCHAR wstrFileName[MAX_PATH] = L"opening.mid";
+
+//The above line's filename should be changed to whatever you wish to load
+//It can either be mid or wav files. Maybe others, look it up.
+ 
+if (FAILED(g_pLoader->LoadObjectFromFile(
+    CLSID_DirectMusicSegment,   // Class identifier.
+    IID_IDirectMusicSegment8,   // ID of desired interface.
+    wstrFileName,           	// Filename.
+    (LPVOID*) &g_pSegment)))    // Pointer that receives interface.
+{		
+    MessageBox( NULL, "Media not found, sample will now quit.", 
+                "DMusic Tutorial", MB_OK );
+    return 0;
+} 
+//make this message box say whatever you want to indicate the file
+//couldn't be found You alter the file name, as well as the location. within SetSearchDirectory(), if you uncomment the L"C:\\..." and delete the NULL, the program will search within anyone's My Shared Folder if that folder exists, for the file specified by the WCHAR wstrFileName[]"..." below it. I did not read the documentation, but took a guess that putting NULL instead of L"" within SetSearchDirectory() would search for the file within the game's directory, and it worked. If you're reading this tutorial, you're likely a beginner, so take the advice and don't be afraid to guess and check. I also suggest looking at the documentation to learn more about GUID_DirectMusicAllTypes. Playing the File Now, add this: g_pSegment->Download( g_pPerformance );
+
+g_pPerformance->PlaySegmentEx(
+    g_pSegment,  // Segment to play.
+    NULL,        // Used for songs; not implemented.
+    NULL,        // For transitions. 
+    0,       	// Flags.
+    0,       	// Start time; 0 is immediate.
+    NULL,        // Pointer that receives segment state.
+    NULL,        // Object to stop.
+    NULL     	// Audiopath, if not default.
+); It plays the file. To keep it playing, put Sleep(5000) or a message box or basically anything you can to keep from reaching g_pPerformance->Stop(
+    NULL,   // Stop all segments.
+    NULL,   // Stop all segment states.
+    0,      // Do it immediately.
+    0   	// Flags.
+);
+g_pPerformance->CloseDown(); Which stops the file. Most likely, you'll have an if( MUSIC_ISDONE) g_pPerformance->Stop(); //<- psuedo-code or similar. After it is done, put this line: CoUninitialize(); And now you stopped the music. Free the Resources We created them, we must destroy them. Before WinMain ends, deInitialize the DMusic globals, like so: DXDELETE(g_pLoader);
+DXDELETE(g_pPerformance);
+DXDELETE(g_pSegment); I personally just put deInit(); at the end, which is where I uninitialize all DX variables. (Coincidentally, I also put the stop() function to stop my background music.) Conclusion Ok, so you can't alter much, but you can change when the music stops and whether you want Midi files playing or not. I believe this becomes more complicated if you want multiple sound files playing. That is beyond the scope of this tutorial. Anyway, complete source code to my project that uses this tutorial is listed below. The project is small so you can still learn from it, and various things are commented out to give you ideas and experiment with. Have fun! //In VC++, under the C/C++ tab within the Project->Settings menu, within
+//the category of Code Generation, change the option under "Use run-time
+//library:" from Single-threaded* to Multithreaded.
+
+
+#define WIN32_LEAN_AND_MEAN
+#define INITGUID
+
+#include dmusici.h // need the arrow thingies, but they don't display in html
+#include windows.h
+#include windowsx.h
+#include fstream.h
+#include string.h
+#include stdio.h
+#include math.h
+
+#define DXDELETE(p) if(p != NULL) p->Release(); // a SAFEDELETE replacement
+// if arrays are deleted, be sure to use delete [] array; first.
+
+// defines
+#define MAINWINDOWNAME "Clone of Game"
+#define MAINWINDOWTITLE "Main Window"
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
+
+// Globals
+HWND mainwindowhandle = NULL; // for later, the main window handle. (needed for wrappers and stuff)
+
+// DX globals
+IDirectMusicLoader8*      g_pLoader   	= NULL;
+IDirectMusicPerformance8* g_pPerformance  = NULL;
+IDirectMusicSegment8* 	g_pSegment      = NULL;
+
+// Game functions
+void deInit(void)
+{
+     g_pPerformance->Stop(
+        NULL,   // Stop all segments.
+        NULL,   // Stop all segment states.
+        0,      // Do it immediately.
+        0   	// Flags.
+    );
+    g_pPerformance->CloseDown();
+ 
+    DXDELETE(g_pLoader);
+    DXDELETE(g_pPerformance);
+    DXDELETE(g_pSegment);
+
+}
+	int xx = 360, yy = 600;
+	RECT washwall = {0,0, 800, 600};
+	HBRUSH brushblack= CreateSolidBrush(RGB(0,0,0));
+// Functions
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+//	PAINTSTRUCT ps; // used in WM_PAINT
+	HDC hdc; // handle to device context, used a lot
+
+	switch(msg)
+	{
+	case WM_CREATE:
+		{
+
+			// called when window is created
+			return(0);
+		} break;
+
+	case WM_PAINT: // called when repaintint is needed (refreshing)
+		{
+			// validate the window
+			hdc= GetDC(hwnd);
+			while(yy > -20) 
+			{
+			FillRect(hdc, &washwall, brushblack);
+			FrameRect(hdc, &washwall, brushblack);
+		
+			// here is where the game is drawn <img src='http://public.gamedev.net/public/style_emoticons/default/smile.gif' class='bbc_emoticon' alt=':)' /> A wrapper or so would come in real handy.
+			SetBkMode(hdc, TRANSPARENT);
+			SetTextColor(hdc, RGB(0,0,255));
+			SetBkColor(hdc, RGB(0,0,0));
+			TextOut(hdc, xx,yy, "CREDITS", strlen("CREDITS"));
+
+			Sleep(5);
+				yy--; 
+	     ReleaseDC(hwnd, hdc);
+			}	
+			
+			return(0);
+		} break;
+		
+	case WM_DESTROY: // called when window is killed
+		{
+			// kill the app
+			// do not release DX objects in here, causes errors.
+
+			PostQuitMessage(0);
+ 
+			return(0);
+		} break;
+	default: break;
+	} // end switch
+	// process any other messages...
+	return (DefWindowProc(hwnd, msg, wParam, lParam));
+} // end WindowProc, the message processing function, since Windows is a message-based OS
+
+
+
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lbCmdLine, int nShowCmd)
+{
+
+	//DMusic and COM setup
+	CoInitialize(NULL);
+    
+    CoCreateInstance(CLSID_DirectMusicLoader, NULL, 
+                 	CLSCTX_INPROC, IID_IDirectMusicLoader8,
+                 	(void**)&g_pLoader);
+
+    CoCreateInstance(CLSID_DirectMusicPerformance, NULL,
+                 	CLSCTX_INPROC, IID_IDirectMusicPerformance8,
+                 	(void**)&g_pPerformance );
+
+
+	// end of COM and DMusic setup
+
+	WNDCLASS mainwindow;
+	HWND hwnd; // generic window handle
+	MSG msg; // generic message
+
+	mainwindow.style = CS_DBLCLKS | CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+	mainwindow.lpfnWndProc = WindowProc;
+	mainwindow.cbClsExtra = 0;
+	mainwindow.cbWndExtra = 0;
+	mainwindow.hInstance = hInstance;
+	mainwindow.hIcon = LoadIcon(NULL, IDI_APPLICATION); // can use resources, IDB_BITMAP and MAKEINTRESOURCE()
+	mainwindow.hCursor = LoadCursor(NULL, IDC_ARROW);
+	mainwindow.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	mainwindow.lpszMenuName = NULL;  // can add menu later
+	mainwindow.lpszClassName = MAINWINDOWNAME; // can be changed using define above...
+	// now that the window class has been styled/filled, we register it
+	if(!RegisterClass(&mainwindow)) // check for errors
+		return (0); // if an error.
+	// now to make the window itself...
+	if (!(hwnd = CreateWindow(MAINWINDOWNAME, MAINWINDOWTITLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		CW_USEDEFAULT,CW_USEDEFAULT, // x, y
+		WINDOW_WIDTH, WINDOW_HEIGHT,
+		NULL, // no parent window handle, since only one window
+		NULL, // no handle to menu, currently
+		hInstance, // instance
+		NULL))) // creation parameters. (might be more useful in CreateWindowEx()?)
+	return(0); // if no errors.
+// save window handle in a global handle variable
+	mainwindowhandle = hwnd;
+
+	// make DMusic initialization
+    	g_pPerformance->InitAudio( 
+        NULL,                  // IDirectMusic interface not needed.
+        NULL,                  // IDirectSound interface not needed.
+        hwnd,                  // Window handle.
+        DMUS_APATH_SHARED_STEREOPLUSREVERB,  // Default audiopath type.
+        64,                    // Number of performance channels.
+        DMUS_AUDIOF_ALL,   	// Features on synthesizer.
+        NULL               	// Audio parameters; use defaults.
+    );
+// end init audio
+
+// DMusic
+		// Find the Windows media directory.
+ /*
+    CHAR strPath[MAX_PATH];
+    GetWindowsDirectory( strPath, MAX_PATH );
+    strcat( strPath, "c:\\Program Files\\KaZaA\\My Shared Folder" );
+ */
+
+
+   // Convert to Unicode.
+ /*
+    WCHAR wstrSearchPath[MAX_PATH];
+    MultiByteToWideChar( CP_ACP, 0, strPath, -1, 
+                     	wstrSearchPath, MAX_PATH );
+ */
+    // Set the search directory.
+ 
+    g_pLoader->SetSearchDirectory( 
+        GUID_DirectMusicAllTypes,   // Types of files sought.
+          /*L"C:\\Program Files\\KaZaA\\My Shared Folder"*/ NULL, //Null for default
+                                                                  // Where to look. was wstrSearchPath
+        FALSE                   	// Don't clear object data.
+    );
+
+	WCHAR wstrFileName[MAX_PATH] = L"DBGT opening.mid";
+ 
+    if (FAILED(g_pLoader->LoadObjectFromFile(
+        CLSID_DirectMusicSegment,   // Class identifier.
+        IID_IDirectMusicSegment8,   // ID of desired interface.
+        wstrFileName,           	// Filename.
+        (LPVOID*) &g_pSegment   	// Pointer that receives interface.
+    )))
+    {
+		
+        MessageBox( NULL, "Media not found, sample will now quit.", 
+                          "DMusic Tutorial", MB_OK );
+        return 0;
+    }
+
+
+    g_pSegment->Download( g_pPerformance );
+
+
+    g_pPerformance->PlaySegmentEx(
+        g_pSegment,  // Segment to play.
+        NULL,        // Used for songs; not implemented.
+        NULL,        // For transitions. 
+        0,       	// Flags.
+        0,       	// Start time; 0 is immediate.
+        NULL,        // Pointer that receives segment state.
+        NULL,        // Object to stop.
+        NULL     	// Audiopath, if not default.
+    );      
+   // unneeded, but helps for splash screens. 
+	/*Sleep(6000);*/ // makes a segment of sound play for a bit.
+
+
+/*
+ g_pPerformance->Stop(
+        NULL,   // Stop all segments.
+        NULL,   // Stop all segment states.
+        0,      // Do it immediately.
+        0   	// Flags.
+    );
+    g_pPerformance->CloseDown();
+ 
+    g_pLoader->Release(); 
+    g_pPerformance->Release();
+    g_pSegment->Release();
+ */ // I put the above in WM_DESTROY, then got an error, put it in deInit()
+
+    CoUninitialize();
+	// Entering main event loop
+// in winMain() the msg pump
+ while(1)
+if(PeekMessage(&msg,NULL,0,0,PM_NOREMOVE)) 
+{
+if(!GetMessage(&msg,NULL,0,0)) return msg.wParam;
+TranslateMessage(&msg); DispatchMessage(&msg);
+// main game goes here
+
+
+} 
+
+
+deInit(); // releases stuff.
+} // end of winMain
+//else if(!appIsInactive)WaitMessate(); Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » DirectX and XNA » Article: Playing MIDIs and WAVs using DirectX English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

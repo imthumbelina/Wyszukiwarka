@@ -1,0 +1,352 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Enginuity, Part IV Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Enginuity, Part V A Singleton Texture Manager for OpenGL Enginuity, Part II Developing a GUI Using C++ and DirectX Part 2 Enginuity, Part III Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 1 Like 1Likes Dislike Enginuity, Part IV By Richard "superpig" Fine | Published Aug 01 2003 10:23 PM in Game Programming static #39 we' return bool it' void inline Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource The Entry Point and Task Pool; or, Swim Your Way In Still reading these? I must be better than I thought. This article we'll take all the code we've produced so far - the Foundation Tier of the Enginuity engine - and actually make an executable program with it. Then we'll put together some of the 'system tasks' that any game will need. But of course, if I'm going to take the code we've produced so far, you'll need to know about it. So go read the other articles, if you haven't already. Entry Point The Application Entry Point is the place in your program where it all begins. Traditional C/C++ programs have an entry point called 'main' - Win32 programs have 'WinMain,' and so on and so forth. If you were to represent your program as a tree, where nodes are functions that call other functions, the entry point would be the very root of the tree. Before now, Enginuity didn't have an entry point, so we couldn't build it into an executable. We're not about to give Enginuity an entry point, either. As an engine, it shouldn't have one; as it is now, we can build it as a library, and have a proper program start the engine whenever it wants. We give extra control to whoever wants to use the engine - perhaps an anti-piracy system needs to be initialized before the engine starts, for example. So what we'll be doing here is looking simply at a sample program that makes use of the engine. The engine could be in a library or DLL, or it could be simply build as part of the project; it doesn't matter. Personally, I'm building the whole thing in one project, and just splitting the source files into 'Engine' and 'Game' folders. Given that we're aiming for a relatively cross-platform engine here, we have a problem. I already mentioned a discrepancy between entry point functions on Win32 and other systems - they have different names (and different parameters). Do we provide both main() and WinMain() functions? Do we use some kind of conditional-compilation trick? Neither. SDL has already solved the problem for us. It contains the code to 'insulate' us from the underlying system - so that when it gets to us, we always use a main() function. SDL provides the 'translation' from WinMain() to main() under Win32, and so on for other platforms. All we have to do is make sure we link to sdlmain.lib, and that we're including sdl.h. Here's the main() function we're going to use: int main(int argc, char *argv[])
+{
+  new CApplication();
+  CApplication::GetSingleton().Run(argc,argv);
+  delete CApplication::GetSingletonPtr();
+
+  //clean up any remaining unreleased objects
+  IMMObject::CollectRemainingObjects(true);
+
+  return 0;
+}Before we get into the body of the function itself, I'll just say this: make absolutely sure that the main() function has a header like the one above. Same return type, same name, same argument types. If you get errors about 'sdl_main is undefined,' check here. (The truth is that sdl_main.h includes a macro to turn any function named main() into one named sdl_main(), so that it doesn't get confused with the main() function that SDL provides. As far as I can tell, an unfortunate side effect of this is that you shouldn't use the name 'main' for any functions or variables; but frankly, I consider it a small price to pay). OK. You're probably wondering what this CApplication class is. You've probably gathered that it's a Singleton; it represents your program. It's often useful to encapsulate (wrap up in a class) the 'application' itself; you get the benefits of construction/destruction, as well as extra control over lifetimes (as we'll see in a moment). The CApplication class, then, is the 'meat' of the program. So the first thing we do is to create a new CApplication object (because that's how the Singleton mechanism works - check back to part 2 if you don't remember). We then pass argc and argv straight into the CApplication's Run() function. When it's done, we delete the CApplication object. So that's the whole of the 'application itself' done. Then we do a last call to IMMObject::CollectRemainingObjects. This is where one of the major advantages of having the CApplication object comes into play. When CollectRemainingObjects() is called, all IMMObject-derived objects will be deleted; but after that, if there are any CMMPointers still around, they'll try calling Release() on their pointers - which will cause an access violation. In the end, we see that we can't call CollectRemainingObjects while there are any IMMObjects alive (and assigned). This means that keeping global CMMPointers is unsafe - they don't get killed till after the main() function is done - so instead, we can keep them in the CApplication object, and they get destroyed when the CApplication object is destroyed. Thus, when we reach CollectRemainingObjects we can release all still-allocated objects to avoid memory leaks completely, without worrying that anything is still latched onto them. When the CApplication object has been shut down, nothing should still be running, no CMMPointers should still be alive. The CApplication object only needs to provide a Run() function; a constructor and destructor are optional (because for the most part, we'll only be adding CMMPointers to the CApplication object, and they have their own constructors), so I'm not going to show you the class definition here. Just remember that it derives from Singleton<CApplication>. Instead, let's skip straight to the Run() function: void CApplication::Run(int argc, char *argv[])
+{
+  //open logfiles
+  if(!CLog::Get().Init())return;
+
+  //create a couple of singletons
+  new CSettingsManager();
+  new CKernel();
+
+  //parse the 'settings.eng' file
+  CSettingsManager::GetSingleton().ParseFile("settings.eng");
+  
+  //parse command-line arguments
+  //skip the first argument, which is always the program name
+  if(argc>1)
+    for(int i=1;i<argc;i++)
+      CSettingsManager::GetSingleton().ParseSetting(std::string(argv[i]));
+  
+  //set up the profiler with an output handler
+  CProfileLogHandler profileLogHandler;
+  CProfileSample::outputHandler=&profileLogHandler;
+
+  //main game loop
+  CKernel::GetSingleton().Execute();
+  
+  //clean up singletons
+  delete CKernel::GetSingletonPtr();
+  delete CSettingsManager::GetSingletonPtr();
+}This is where many of the systems we've built up over the past articles tie together. First, the logfiles. We want to have these available to us throughout the startup process, so that if something goes wrong and the game can't start at all, the logfiles are around for the user to find out why. As soon as possible, we create the singletons - creating the CSettingsManager first is probably a good idea because the kernel may have some settings that should be in place before it gets constructed. Next, we parse the 'settings.eng' file. This is totally optional, and the name is arbitrary, but you're probably going to need to load in a configuration file at some point, and now is as good a time as any. It's particularly useful when testing - you can set the screen mode so that you don't have to wait for the mode to change each time (and if you're on a multiple-monitor system, mess up your window layout ;-) ). Then, the command-line arguments. We do these after settings.eng so that the command-line can 'override' the stored settings. We set the profiler up to output to the logs (using our already-setup ProfileLogHandler). It's far from being the best output mechanism - ideally, we should be able to see stats on-screen while the game is running - but that's something we'll do later. Then we start the main game loop itself (with CKernel::Execute()). Because we've not registered any tasks, this will return almost immediately. Lastly we clean up our singletons. If you build the project now, you should find that there are no unresolved dependencies, so it builds ok - running it will have the program start up and then exit. If you want to see for certain that it's running ok, add a log message in there (before CKernel::Execute(), probably). Let your mouth fall open in wonder and amazement; this is the blank slate of an engine upon which we build... The Task Pool The 'task pool' is the term I use to refer to the group of tasks that the engine is running at any given time. There are certain tasks that run pretty much all of the time - 'system tasks' - such as the timer or input tasks. These system tasks are what we're going to look at now. Timer The global timer task will be responsible for working out how many seconds have passed since the last frame. We can use that number to scale things like physics code, so that things move at the same speed across different machines: class CGlobalTimer : public ITask
+{
+public:
+  AUTO_SIZE;
+  
+  static float dT;
+  static unsigned long lastFrameIndex;
+  static unsigned long thisFrameIndex;
+
+  bool Start();
+  void Update();
+  void Stop();
+};
+
+bool CGlobalTimer::Start()
+{
+  thisFrameIndex=SDL_GetTicks();
+  lastFrameIndex=thisFrameIndex;
+  dT=0;
+  return true;
+}
+
+void CGlobalTimer::Update()
+{
+  lastFrameIndex=thisFrameIndex;
+  thisFrameIndex=SDL_GetTicks();
+  dT=((float)(thisFrameIndex-lastFrameIndex))/1000.0f;
+}
+
+void CGlobalTimer::Stop()
+{
+
+}SDL_GetTicks() returns the number of milliseconds since SDL_Init() was called, which we store in thisFrameIndex. To work out the elapsed time for this frame, we subtract the previous frame's value from that value, and divide by 1000 (to convert from milliseconds to seconds). The result is stored in a public static variable for easy access (so technically we should make the CGlobalTimer a Singleton, to prevent anyone creating more than one of it, but I didn't because multiple inheritance is something I wanted to avoid, if possible). Sound The sound task will initialize and shutdown the sound system, as well as pausing all active sounds when the task is paused. When pausing, we need to store which channels are actually active so we know which ones to unpause - the game itself might have paused some channels for it's own ends, and we don't want to accidentally unpause them. class CSoundTask : public ITask
+{
+public:
+  bool Start();
+  void OnSuspend();
+  void Update();
+  void OnResume();
+  void Stop();
+
+  AUTO_SIZE;
+
+protected:
+  CMMPointer<CMMDynamicBlob<bool> > isPaused;
+};
+
+bool CSoundTask::Start()
+{
+  if(FALSE==FSOUND_Init(44100, 32, 0))return false;
+  return true;
+}
+
+void CSoundTask::OnSuspend()
+{
+  //pause all channels, storing the pause state in the isPaused array
+  //once the states are stored we can use FSOUND_ALL to pause all
+  //channels the easy way
+  int chCount=FSOUND_GetMaxChannels();
+  isPaused=new CMMDynamicBlob<bool>(chCount);
+  for(int i=0;i<chCount;i++)
+  {
+    if(FSOUND_IsPlaying(i))
+    {  
+      isPaused->buffer[i]=true;
+    }else{
+      isPaused->buffer[i]=false;
+    }
+  }
+  FSOUND_SetPaused(FSOUND_ALL,TRUE);
+}
+
+void CSoundTask::Update()
+{
+  //we don't need to do anything, FMOD does it all for us <img src='http://public.gamedev.net/public/style_emoticons/default/smile.gif' class='bbc_emoticon' alt=':)' />
+}
+
+void CSoundTask::OnResume()
+{
+  //unpause all the flagged channels
+  if(isPaused)
+  {
+    int chCount=FSOUND_GetMaxChannels();
+    for(int i=0;i<chCount;i++)
+    {
+      if(isPaused->buffer[i])FSOUND_SetPaused(i,FALSE);
+    }
+    isPaused=0;
+  }
+}
+
+void CSoundTask::Stop()
+{
+  FSOUND_Close();
+}Input The input task has to get SDL to update it's internal input information, and then it has to read that information out. Again, we use public static variables for easy access (so again, I should make this a Singleton, but I haven't).Something to note is that SDL_GetKeyState returns a pointer to SDL's internal array - so we shouldn't free it ourselves. class CInputTask : public ITask  
+{
+public:
+  CInputTask();
+  virtual ~CInputTask();
+
+  bool Start();
+  void Update();
+  void Stop();
+
+  static unsigned char *keys;
+  static CMMPointer<CMMDynamicBlob<unsigned char> > oldKeys;
+  static int keyCount;
+  
+  static int dX,dY;
+  static unsigned int buttons;
+  static unsigned int oldButtons;
+
+  static bool inline curKey(int index) { return (keys[index]!=0); }
+  static bool inline oldKey(int index) { return ((*oldKeys)[index]!=0); }
+
+  //some helper functions to make certain things easier
+  static bool inline keyDown(int index)
+      { return ( curKey(index))&&(!oldKey(index)); }
+  static bool inline keyStillDown(int index)
+      { return ( curKey(index))&&( oldKey(index)); }
+  static bool inline keyUp(int index)
+      { return (!curKey(index))&&( oldKey(index)); }
+  static bool inline keyStillUp(int index)
+      { return (!curKey(index))&&(!oldKey(index)); }
+
+  static bool inline curMouse(int button)
+      { return (buttons&SDL_BUTTON(button))!=0; }
+  static bool inline oldMouse(int button)
+      { return (oldButtons&SDL_BUTTON(button))!=0; }
+
+  static bool inline mouseDown(int button)
+      { return ( curMouse(button))&&(!oldMouse(button)); }
+  static bool inline mouseStillDown(int button)
+      { return ( curMouse(button))&&( oldMouse(button)); }
+  static bool inline mouseUp(int button)
+      { return (!curMouse(button))&&( oldMouse(button)); }
+  static bool inline mouseStillUp(int button)
+      { return (!curMouse(button))&&(!oldMouse(button)); }
+
+  AUTO_SIZE;
+};
+
+bool CInputTask::Start()
+{
+  keys=SDL_GetKeyState(&keyCount);
+  oldKeys=new CMMDynamicBlob<unsigned char>(keyCount);
+  dX=dY=0;
+  SDL_PumpEvents(); SDL_PumpEvents();
+  return true;
+}
+
+void CInputTask::Update()
+{
+  SDL_PumpEvents();
+
+  oldButtons=buttons;
+  buttons=SDL_GetRelativeMouseState(&dX,&dY);
+
+  memcpy((unsigned char*)(*oldKeys),keys,sizeof(unsigned char)*keyCount);
+  keys=SDL_GetKeyState(&keyCount);
+}
+
+void CInputTask::Stop()
+{
+  keys=0;
+  oldKeys=0;
+}What's with the oldKeys and oldButtons members? At any given time, if you check a key in the keys array, all you'll know is if the key is down; not if it's just been pressed, or if it's being held down, or if it's just been released, and so on. By comparing it to it's previous state, oldKeys, we can quickly see if it's going down, going up, or staying put. Same goes for the mouse buttons. That's what all those inline functions are for you could write a separate 'input event' task which watches for those sorts of conditions and translates them into 'events' in a queue - a little more useful for things like text entry (because otherwise you just have to check every key, every frame). Renderer It's time we got something significant on screen. The VideoUpdate task will be responsible for starting up and shutting down the video system, along with swapping the screen buffers (because we're working with double buffers). It's also the first part of the engine to use the settings mechanism - we're going to have the screen mode (width, height, and BPP) registered as settings. class CVideoUpdate : public ITask  
+{
+public:
+  CVideoUpdate();
+  virtual ~CVideoUpdate();
+  AUTO_SIZE;
+
+  static int scrWidth, scrHeight, scrBPP;
+  static CMMPointer<Dator<int> > screenWidth, screenHeight, screenBPP;
+
+  bool Start();
+  void Update();
+  void Stop();
+};
+
+bool CVideoUpdate::Start()
+{
+  assert(screenWidth && screenHeight && screenBPP);
+
+  if(-1==SDL_InitSubSystem(SDL_INIT_VIDEO))
+  {
+    CLog::Get().Write(LOG_CLIENT,IDS_GENERIC_SUB_INIT_FAIL,
+        "Video",SDL_GetError());
+    return false;
+  }
+  SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 8 );
+  SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 8 );
+  SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 8 );
+  SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 8 );
+  SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 16 );
+  SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
+
+  int flags = SDL_OPENGL | SDL_ANYFORMAT | SDL_FULLSCREEN;
+
+  if(!SDL_SetVideoMode(scrWidth, scrHeight, scrBPP, flags))
+  {
+    CLog::Get().Write(LOG_CLIENT, IDS_BAD_DISPLAYMODE,
+        scrWidth, scrHeight, scrBPP, SDL_GetError());
+    return false;
+  }
+
+  //hide the mouse cursor
+  SDL_ShowCursor(SDL_DISABLE);
+
+  return true;
+}
+
+void CVideoUpdate::Update()
+{
+  SDL_GL_SwapBuffers();
+}
+
+void CVideoUpdate::Stop()
+{
+  SDL_QuitSubSystem(SDL_INIT_VIDEO);
+}[code]
+There. We also need to head back to the CSettingsManager, and add the following to CreateStandardSettings:
+
+[code]SETTING(int, CVideoUpdate::screenWidth,  CVideoUpdate::scrWidth,  "screenX");
+SETTING(int, CVideoUpdate::screenHeight, CVideoUpdate::scrHeight, "screenY");
+SETTING(int, CVideoUpdate::screenBPP,    CVideoUpdate::scrBPP,    "screenBPP");[/code]
+Also, we add to DestroyStandardSettings:
+
+[code]CVideoUpdate::screenWidth  = 0;
+CVideoUpdate::screenHeight  = 0;
+CVideoUpdate::screenBPP  = 0;[/code]
+The parameters for the SETTING macro are, in case you'd forgotten, the type, dator, variable to bind the dator to, and name for the setting within the manager. Finally, it's worth noting the static definitions of scrWidth/scrHeight/scrBPP:
+
+[code]int CVideoUpdate::scrWidth=800;
+int CVideoUpdate::scrHeight=600;
+int CVideoUpdate::scrBPP=16;[/code]
+If no setting is given for screenX/screenY/screenBPP in the settings file or on the command line, no assignments will be made to the relevant dators and so scrWidth/scrHeight/scrBPP will not be changed from their initial values. Thus, set them up with your default values.
+
+ [size="5"][b]Pulling it all together (again)
+[/b][/size]
+Now that we've got these tasks, let's head back to our game-specific CApplication object, and try them out. We'll need to decide on priorities for each one - the priorities determine the order in which the tasks are run - and we'll need a simple task of our own to add to the mix, otherwise the app won't really do anything at all (including exit).
+
+ Here's the order of execution - the 'pipeline:'
+
+[code]CGlobalTimer  (priority: 10)
+CInputTask  (priority: 20)
+CSoundTask  (priority: 50)
+COurTestTask  (priority: 100)
+CVideoUpdate  (priority: 10000)[/code]
+You can see that the tasks are fairly well spaced out; an app could add at least 9 tasks between the system ones, and the gap between the sound task and the video update is large enough for anything. Before we set up the pipeline itself, here's the test task:
+
+[code]class COurTestTask : public ITask
+{
+public:
+  bool Start()
+    {return true;}
+  void Update()
+    {
+      glClear(GL_COLOR_BUFFER_BIT);
+      if(CInputTask::mouseDown(SDL_BUTTON_LEFT))
+        CKernel::GetSingleton().KillAllTasks();
+    }
+  void Stop(){};
+  AUTO_SIZE;
+};[/code]
+Very simple. It'll just cause all tasks to shutdown when you press the left mouse button, and clears the screen in the meantime. So, now we go back to CApplication::Run, and just before calling CKernel::Execute(), we create tasks and put them into the pipeline:
+
+[code]//it's probably a good idea to have all the system tasks together.
+//The priority system means the tasks can officially be created in
+//any order (though bear in mind that the CVideoUpdate task must be
+//added to the kernel before any task using GL functions in its 
+//Start() method, because SDL_VIDEO will not have been initialized).
+//We'll create the system tasks first and then our game-specific ones
+//afterwards. It also ensures that when we get to game-specific tasks,
+//things like FSOUND_Init() have been called.
+
+CMMPointer<CGlobalTimer> globalTimer = new CGlobalTimer();
+globalTimer->priority=10;
+//the CMMPointer<ITask> expression here is used to typecast
+//the pointer from CGlobalTimer* to ITask*
+CKernel::GetSingleton().AddTask(CMMPointer<ITask>(globalTimer));
+
+CMMPointer<CInputTask> inputTask = new CInputTask();
+inputTask->priority=20;
+CKernel::GetSingleton().AddTask(CMMPointer<ITask>(inputTask));
+
+CMMPointer<CSoundTask> soundTask = new CSoundTask();
+soundTask->priority=50;
+CKernel::GetSingleton().AddTask(CMMPointer<ITask>(soundTask));
+
+videoTask = new CVideoUpdate();
+videoTask->priority=10000;
+CKernel::GetSingleton().AddTask(CMMPointer<ITask>(videoTask));
+
+//game-specific tasks:
+
+CMMPointer<COurTestTask> tt=new COurTestTask();
+tt->priority=100;
+CKernel::GetSingleton().AddTask(CMMPointer<ITask>(tt));[/code]
+Build and test that - you should get a blank screen, which exits when you click the mouse. In the word of many millions of people, 'Yes!'
+
+[size="5"][b]The Code[/b][/size]
+
+The code for this article contains a bit more than what we've seen here - I've written a very (and I mean very) basic implementation of Pong. Move your paddle using the mouse; click (or just lose the game <img src='http://public.gamedev.net/public/style_emoticons/default/tongue.gif' class='bbc_emoticon' alt=':P' /> ) to exit. See what you can do with it - if you need ideas, I'd suggest getting the ball to come off the paddle at different angles depending on where you hit it, or maybe adding sound. The relevant code is in CPongTask, in main.cpp; I recognize that you can't do much impressive stuff without texturing, which is coming soon. Still, consider it an exercise in pure gameplay - if you can make that Pong game fun, without using any fancy graphics and effects further than shaded polygons, then major kudos; I'll be truly impressed. Maybe it should be a lounge mini-contest.
+
+ There are also some updates to code from previous articles, based on feedback I've had from people (mostly minor bugfixes). The most important change is probably in the memory manager - previously, I'd overlooked stack objects, which could have lead to *serious* problems:
+
+[code]CSomeIMMObjectDerivedClass obj;
+CMMPointer<CSomeIMMObjectDerivedClass> ptr=&obj;
+ptr=0;
+IMMObject::CollectGarbage();
+//heap fault - obj has a reference count of zero, but we
+//shouldn't call delete() because we didn't allocate it using new()!The memory manager has now been updated to handle them. I believe I've commented the code; the best documentation, however, is the discussion that lead to the discovery (and later fixing) of the problem, in the discussion thread for Enginuity part 2. Indeed, all the discussion threads have been rich sources of information and ideas for me (and others too, they tell me ). Conclusion Well, that's a basic (and I mean basic) engine finished. You could stop reading now, and just work with what we've built up together; it's a pretty stable base for any project. Maybe you'd care to rewrite it with DirectX or change some other fundamental feature; I hope my articles have given you enough understanding of the way the engine works to allow you to do that. However, as much as you can stop reading, doesn't mean I'm going to stop writing. After all, I haven't met my specification yet - there's still the networking system to be implemented, along with the beginnings of a 3D graphics system... but more importantly, there's no games built on this engine yet! It's no good if games can't actually *use* it. I'd just like to take this opportunity to thank the people who've supported me so far - eldee, my loyal proofreader; Oluseyi, my seems-loyal-enough-but-I-reckon-has-a-hidden-agenda-yeah-buddy-I'm-onto-you proofreader; and all the many people who gave me their comments and feedback, through email, the forums, and IRC. I'll try not to let you down as I progress. So, I'm far from finished. Next article I plan to cover textures and fonts, as well as the mysterious Interpolators and Triggers systems. In the meantime, I recommend you visit the 'Discuss this article' link to point out all my mistakes and pick apart my methods; or, of course, you can still email me (rfine at tbrf dot net). Download attached article resource Comments sharavsambuu Dec 24 2011 11:59 PM Thanks for your amazing tutorial!!! Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Enginuity, Part IV English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

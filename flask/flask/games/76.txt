@@ -1,0 +1,174 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Sound Formats and Their Uses in Games Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This A Quick Guide to FMOD Introduction to Ogg Vorbis Getting Started with Audacity Writing Game Music : Part II Loading a Wave File Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Sound Formats and Their Uses in Games By Casey Wireman | Published Apr 13 2003 06:33 PM in Game Programming file sdl format sound wav play files ogg quality Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource After seeing that people wanted a bit more substance to my article, I decided that I would add some meat to it. I apologize for the huge delay in rewriting this thing like I said I would, but things came up, blah blah blah. The point is that I finished it and this go around we'll have some tutorials using different APIs to play various formats. Hope you enjoy it, or at least learn a little something from it. First, let's talk about what to look for in a file when making a game. What are our needs? Probably at the top of the list for most people is quality. We want our audience to enjoy every aspect of the experience that we are trying to provide them when they are playing our game. If the graphics for your game are bad not many people are going to want to play it; the same can be said for low quality sound. As an example of the importance of sound, turn the volume off when playing your favorite game and see if it's as much fun. Sound adds to the immersion that people want when playing a game. If you don't have good quality sound, it will detract from this immersion. The next thing to look for when selecting a file type is the resulting file size. Today, people don't want to wait for the game to load, they want instant gratification. From a development standpoint we can't always give them that; all media, of course, has to be loaded in order to be used. Now granted, with increasing computing power and larger amounts of RAM (measuring in the gigabytes in some cases) loading times are decreasing significantly. Bear in mind however that everyone is not a diehard gamer or developer and is not likely to beef up their systems to play such resource intensive games. The demographic that you may be shooting for might be casual or older gamers that just want to play something quick, possibly something to pass time on a break at work. When choosing the format to use in your project you should take all of this into consideration as well as the documentation of the desired filetype. Formats .WAV This is probably the most documented sound file in use today. The .WAV file is comparable to the .BMP image file in that WAV files have good quality but they take up more room than other file types. This is a file type supported basically by default in Windows and in fact, it is in one of the Windows libraries. Since the file size can get fairly large depending on what your recording settings are at and the length of the sound, it is best to use this format for small noises or sound effects. In most cases you will not want to use this format for long musical pieces. As a running example of compression technologies, I have used Sonic Foundry Sound Forge 5.0 and extracted a song from a CD. I first saved it as a .WAV with the following parameters: Sample rate: 44,100 Hz Bit depth: 16 Stereo sound This song came out to be 47.9 MB as a raw WAV file with no compression. We'll see what we can get this down to in the end . As a note, WAV files can have compression in them using various codecs. All APIs do not automatically support compressed WAVs, however. To show WAV compression I used Sound Forge and saved the file as the IMA ADPCM format which had the following parameters: 44,100 kHz, 4 bit, stereo. This version output a file of 12 MB. So, we have a WAV with compression. The file size is greatly reduced, but not enough for me. I may not have used the best compressor for the WAV file, but this just shows that WAV compression is definitely possible, though not as good as other formats. Bottom Line- Well Documented and easy to use. File size can get pretty large unless you choose to use codecs for them. Good choice to use for sound effects or other small audio pieces. .MP3 I'm sure you're familiar with this file type if you spend any time listening to music online. This format is graced with good compression technology with minimal quality loss. As an example of the compression used in MP3s I again used Sonic Foundry Sound Forge 5.0 to convert the above mentioned 47.9 MB WAV to an MP3. Saving as an MP3 doesn't give as many options, so I selected 128 Kbps CD quality audio from the template tab. The resultant file was 4.34 MB. Not bad, we're getting somewhere. As a test, I changed the WAV file again to MP3, but this time using the 64 Kbps FM Radio Quality Audio selection from the template button. The output file was 2.17 MB, but the quality wasn't nearly as good, as was to be expected. When doing audio for games you want to balance between size and quality, this was apparently too big of a leap. Bottom Line- Well documented, many examples online. Good format to use for a lot of speech or music. .OGG This format has been getting a good bit of attention lately. The format hasn't been widely used yet, but it is catching on. You can find information for developing with the Ogg Vorbis format at http://www.xiph.org/...s/download.html. Here you can use links to find the files you need. You can get the Win32 SDK and a few other useful files. To show the compression technology of the OGG format, I downloaded a program found on the www.vorbis.com site. http://www.vorbis.co...gdrop-win32.zip This utility takes audio files and lets you drop them into the window and converts them to the .OGG file for you. You can change parameters for the application, and I played around with the quality settings to get a good balance between quality and size. I first set the quality setting in the utility to 1.0 as someone had suggested to me. The quality was ok, but I could tell that it wasn't anywhere close to the original. I played around with it until I got a suitable sound at quality setting 2. The .OGG I got was 2.99 MB and sounded good! Very cool. As a note about the previous version of this article, I was using Sound Forge to convert to the OGG format and at that time the best compression for the OGG file was a bit higher than an MP3, but using the utility from the site, presumably much newer, I got this decrease in size. Bottom Line- Best compression found in this experiment for song quality audio. Some neat utilities can be found on the site to help you convert your songs to the format without having to write code to do it yourself (always a plus). MIDI Now, when you think about games these days you don't immediately think of MIDI files as being used, right? Wrong. Although the end format may not be a .MID(I), composers in film and games use the MIDI format quite extensively to quickly setup their musical pieces. The thing to remember about MIDIs is that the bleeps and boops you think of when thinking about MIDIs are not the only sounds available. I'm not a composer myself, just a lowly programmer, but in my research for this article I have found that you can get different Instrument Definition Files (IDF) to use in the MIDIs. These files are what make or break the sound coming from your speakers when you play a MIDI. You can have the less than pleasing bleeps, or, you can have a song that would rival an MP3 in its sound. It all depends on your IDF. Here's a recent thread in the Music and Sound Forum where people who actually do compose music can explain the technicalities of music composition for games as it relates to the MIDI format much better than I can. Lucky for us though, our job is not to make music, our job as programmers is to make the music play. Bottom Line- MIDIs can be fairly small in size and if given the right IDF can sound great. The format has been around for a long time and because of that there many examples and samples available all over the net. For more information on the above formats and others check http://www.wotsit.org, they have a lot of good information on just about any format you can imagine. APIs I will go over a couple of APIs that will allow you to play sound files for your games. I'll show an example of playing .OGG, MIDI, MP3 and .WAV files. The examples I will show you will be in APIs that are compatible across many different platforms, so no matter what OS you're running you should have little to no trouble in getting the examples working for your particular setup. Now, on to the code... SDL I was turned on to SDL when I was browsing the bookshelves at Borders and came across Ernest Pazera's book, Focus on SDL. I highly recommend it. SDL, for those of you who may not know, is a library put together to be as cross-platform compatible as possible. This is very nice to have, as building a version for a different system (Linux for example), requires in most cases nothing more than building it with the correct set of libraries for that OS. This is assuming, however, that you are writing little to no OS specific code. Standard C/C++ should compile fine. As of this writing, the newest SDL_mixer version is 1.2.5. This version is very flexible and easier (if that's possible with SDL) to use. The developers of the library have made it support loading of OGG files without having to build your program with the libraries for the OGG format. You'll love the simplicity of SDL if you're not already familiar with it. Now, before we get on to the code, you're going to need to setup your development environment. Instead of reinventing the wheel here, I'll refer you to an article written by Mr. Pazera on this very topic. Once you've setup the compiler you're ready to do some coding with SDL_mixer. The following program sets up a very basic window for SDL and initializes the SDL_mixer. Next, the program loads in the specified music file (in the case of the below program, the file to be played is in the project folder). Next you play it and loop, and finally you do some cleanup functions. Easy. WAV #include "sdl.h" 
+#include "sdl_mixer.h"
+#include <stdlib.h>
+
+SDL_Surface* surface = NULL; //sets up your video surface
+
+SDL_Event event; //event structure
+
+Mix_Music* music; //music object
+
+//main function
+int main(int argc, char* argv[])
+{
+  //initialize SDL
+  if (SDL_Init(SDL_INIT_VIDEO)==-1)
+  {
+    //error initializing SDL
+
+    //report the error
+    fprintf(stderr,"Could not initialize SDL!\n");
+
+    //end the program
+    exit(1);
+  }
+  else
+  {
+    //SDL initialized
+
+    //report success
+    fprintf(stdout,"SDL initialized properly!\n");
+
+    //set up to uninitialize SDL at exit
+    atexit(SDL_Quit);
+  }
+
+  //create windowed environment
+  /*First parameter is screen width, second is for screen height, third param is for bit 
+  depth, and the last parameter is for different flags to be set, in this case: SDL_ANYFORMAT 
+  serves to use the pixel format of the actual display surface*/
+
+  surface = SDL_SetVideoMode(640, 480,0,SDL_ANYFORMAT);
+
+  //error check
+  if (surface == NULL)
+  {
+    //report error
+    fprintf(stderr,"Could not set up display surface!\n");
+
+    //exit the program if we have an error
+    exit(1);
+  }
+
+  //start up sdl_mixer
+  
+  Mix_OpenAudio(MIX_DEFAULT_FREQUENCY,MIX_DEFAULT_FORMAT,1,4096);
+
+  Mix_Chunk *sample; //load in the music
+  sample=Mix_LoadWAV("filename.wav"); 
+
+if(Mix_PlayChannel(-1, sample, 1)==-1) {
+    //error
+}
+
+  //repeat
+  for(;;)
+  {
+    //wait for an event
+    if(SDL_PollEvent(&event)==0)
+    {
+      //update screen
+      SDL_UpdateRect(surface,0,0,0,0);
+    }
+    else
+    {
+      //event occurred, check for quit
+      if(event.type==SDL_QUIT) break;
+    }
+  }
+  //clean up
+  Mix_FreeChunk(sample);
+  sample=NULL;//make sure we free it
+  Mix_CloseAudio();
+  return(0);
+}Now on to one of the newer formats: OGG. Well, you may be thinking that this is going to take some fiddling and working to get up and running properly. No need to worry though. With this new version of the library, the OGG format is automatically supported, so the only thing that you have to do is change one setting of the above code to get it to play an OGG: sample=Mix_LoadWAV("filename.ogg");Pretty cool, huh? FYI: As a test of the flexibility of the SDL_mixer library, I tried to play the compressed WAV that I made earlier as well as the regular WAV file. SDL required nothing special to be done, just simply telling it what file to play is all that is needed. There's no headache in using compressed WAVs as far as SDL is concerned. This has the benefit of you not having to fuss with some tricky code to get working and leave you to focus on your game, which is the important thing anyway. SDL_mixer doesn't have native MP3 support as of this release, you need to have another library (SMPEG) installed for it to work. MIDI MIDI files, as I said earlier, are not usually used today as is in games. If, however, you need to play a MIDI in a game, here's how. Playing MIDIs is a bit different than playing WAVs or OGGs. Instead of this block of code to play OGGs and such: Mix_Chunk *sample; //load in the music
+sample=Mix_LoadWAV("filename.wav");
+if(Mix_PlayChannel(-1, sample, 1)==-1) {
+	//error
+
+}We use this, which uses Music instead of chunk functions: Mix_Music *music; //load in the music
+music=Mix_LoadMUS("filename.midi");
+if(Mix_PlayMusic(music, -1)==-1){
+  //error
+}And that's all you have to do to change over and play this new set of audio files (which include WAVE, MOD, MIDI, OGG, MP3 (if you have SMPEG installed)). Since we used a different initialization function and playing function for our file, we in turn need to use a different cleanup function. Instead of: Mix_FreeChunk(sample);
+sample=NULL; //make sure we free itWe use: Mix_FreeMusic(music);
+music=NULL; //make sure we free itOk, we've covered how to play 3 (well, 4 if you count the compressed WAV file, which took nothing extra to accomplish) different file types using the SDL_mixer library, but these are not the only formats that can be played with the above code according to the library docs found at http://jcatki.no-ip....ixer_frame.html (a very good resource). The above code will play WAVE, AIFF, RIFF, and VOC files. This flexibility is a huge benefit to us as programmers, no need in writing multiple loaders and players when it has already been done for you. FMOD As of this writing this is my first encounter with FMOD, but I'll be the first to say that it's pretty easy to get up and running with it. FMOD is a great little sound system that you can plop into about any machine from Windows to Linux, and XBox to Gamecube, they've got all the bases covered. FMOD is, as I said, extremely easy to get up and running, dare I say, easier than SDL_mixer. As hard as that may be to believe, I think it's true. SDL required a lot of little initialization functions, not so with FMOD. Here's a crash course on setting up FMOD in VC++. Download the API from here: www.fmod.org Unzip to an easy to find place (mine's on the desktop). Now, fire up MVC++ go to Tools->Options and click the directories tab. Make a new entry for Include files and go to the folder you unzipped to and go to API->Inc. Now switch to Library files in the drop down box and do the same as above but click through to lib. Finally click OK. Now, for the project settings, click Project->Settings and click the link tab. Under Object/Library Modules type fmodvc.lib at the beginning, and you're all set. One last thing, since we're using SDL to setup a window, go ahead and setup those project settings too. Lastly, make sure that you put SDL.dll and fmod.dll in your project folder. OK, now we're ready to do some coding. #include "sdl.h" 
+#include "fmod.h"
+#include <stdlib.h>
+
+SDL_Surface* surface = NULL; //sets up your video surface
+
+SDL_Event event; //event structure
+
+//main function
+int main(int argc, char* argv[])
+{
+  //initialize SDL
+  if (SDL_Init(SDL_INIT_VIDEO)==-1)
+  {
+    //error initializing SDL
+
+    //report the error
+    fprintf(stderr,"Could not initialize SDL!\n");
+
+    //end the program
+    exit(1);
+  }
+  else
+  {
+    //SDL initialized
+
+    //report success
+    fprintf(stdout,"SDL initialized properly!\n");
+
+    //set up to uninitialize SDL at exit
+    atexit(SDL_Quit);
+  }
+
+  //create windowed environment
+  /*First parameter is screen width, second is for screen height, third param is for bit 
+  depththe last parameter is for different flags to be set, in this case: SDL_ANYFORMAT 
+  serves to use the pixel format of the actual display surface*/
+
+  surface = SDL_SetVideoMode(640, 480,0,SDL_ANYFORMAT);
+
+  //error check
+  if (surface == NULL)
+  {
+    //report error
+    fprintf(stderr,"Could not set up display surface!\n");
+
+    //exit the program
+    exit(1);
+  }
+
+  FSOUND_Init(44100,32,0);//initialize fmod at 44100 hz, 32 software channels, last
+                          //param is for flags, we won't use any here
+  FSOUND_STREAM *stream; //make a pointer for the FSOUND_STREAM_LOAD to return to
+  stream=FSOUND_Stream_Open("filename.mp3", 1, 0, 0);
+  /*set the stream pointer to our data, 
+  first parameter is the name of our file, second param is the mode in which we're playing
+  the file, 3rd and 4th parameters are optional offset and length values respectively
+  if not set they default to 0*/
+
+  FSOUND_Stream_Play(FSOUND_FREE, stream);
+    //repeat
+  for(;;)
+  {
+    //wait for an event
+    if(SDL_PollEvent(&event)==0)
+    {
+      //update screen
+      SDL_UpdateRect(surface,0,0,0,0);
+    }
+    else
+    {
+      //event occurred, check for quit
+      if(event.type==SDL_QUIT) break;
+    }
+  }
+//cleanup
+FSOUND_Stream_Close(stream);//shutdown and close stream
+stream=NULL;//make sure we closed it
+  return(0);
+}As you can see, this is almost exactly like the previous program, most of this is the same window code from before, nothing special, I just stripped out all of the SDL_mixer code and added FMOD code instead. And that's it, FMOD is working. The above code will play .WAV (including the compressed WAV), .MP2, .MP3, .OGG, .MID, .RAW, .MOD, .S3M, .XM, .IT formats via a file stream. All that should be needed is to change the name of the file in FSOUND_Stream_Open. FYI so that you don't make the same mistake, when I started with FMOD I used FMUSIC_LoadSong instead of streaming it, this made a big difference. When you load the song, it loads it and decompresses it into RAM, making for a huge memory footprint just to play one song. Streaming, on the other hand, allows the file to load as it progresses instead of dumping everything into RAM. Loading the entire piece into memory is ideal for sound effects and such that will be played a lot or maybe even short loops that play in the background, but definitely not desirable for a full length song. Again, I apologize for the large delay in updating this thing, but I'm glad I've finished it now. If you have any comments, suggestions, feedback, concern, etc., please e-mail me at oglfreak@hotmail.com. Thanks for reading and I hope that you got something out of this article. Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Sound Formats and Their Uses in Games English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

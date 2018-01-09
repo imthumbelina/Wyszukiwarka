@@ -1,0 +1,149 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Understanding the Windows Aspect of DirectX Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Setting up a window Example of the Minimal Win32 & OpenGL program Playing MIDIs and WAVs using DirectX Converting MS-DOS-based Games to Windows 95: A Report from the Trenches Using the Windows Template Library Part 1: Getting Started Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Understanding the Windows Aspect of DirectX By Unknown | Published Oct 13 1999 11:33 AM in Game Programming window hwnd case hinstance directx function wparam null return Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Understanding the Windows Aspect of DirectX Even though DirectX mostly shields you from Win32 programming, you still have to create the window. Don't freak out yet. It's really easy and can be reused in any future Windows program that you write. What we're going to do with this tutorial is create a window with a black background. We will not be using any DirectX in this tutorial. We simply want to create a window that can be reused later. I will display the functions in this tutorial and try to give a brief understanding of everything. But I will only focus on the parts that are important to the DirectX programming tutorials. The first thing you will need will be too globals that will handle the window. HWND     	hWnd; 	   	// this is the main window handle
+HINSTANCE hInstance    // this is the instance of the You will also need a BOOL global that will be true when our window has the focus. BOOL bActive; We are also going to have to defines for the Window Class Name and the window Title. #define NAME 	"Win Tutorial"
+#define TITLE 	"Win Tutorial"The first function we are going to do is the DoInit(). Here is the function... /*
+ * doInit - do work required for every instance of the application:
+ *            	create the window, initialize data
+ */
+static BOOL doInit( HINSTANCE hInstance, int nCmdShow )
+{
+	HWND  	hwnd;
+	WNDCLASS  wc;	// this is used to access your windows class components
+
+	/*
+ 	* set up and register window class
+ 	*/
+	wc.style = CS_HREDRAW | CS_VREDRAW;
+	wc.lpfnWndProc = WindowProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = hInstance;
+	wc.hIcon = LoadIcon( hInstance, IDI_APPLICATION );
+	wc.hCursor = LoadCursor( NULL, IDC_ARROW );
+	wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	wc.lpszMenuName = NAME;
+	wc.lpszClassName = NAME;
+	RegisterClass( &wc );
+    
+	/*
+ 	* create a window
+ 	*/
+	hwnd = CreateWindowEx(
+    	0,
+    	NAME,
+    	TITLE,
+    	WS_POPUP,
+    	0,
+    	0,
+    	1,
+    	1,
+    	NULL,
+    	NULL,
+    	hInstance,
+    	NULL );
+
+	/* 
+ 	* if something went wrong with the CreateWindowEx function then return FALSE
+ 	*/
+
+	if( !hwnd )
+	{
+    	return FALSE;
+	}
+
+	/*
+ 	* Show the window and make sure that it is updated
+ 	*/
+	ShowWindow( hwnd, nCmdShow );
+	UpdateWindow( hwnd );
+
+	/* Below here you will initialize your DirectX components and your game */
+
+} That's the initialization function all wrapped up in a nice neat little ball. I put a comment in to tell you where your game and DirectX initialization code will go. You should be able to see what it's doing by reading the comments but let's recap. Setup and register the windows class. Create the window with a call to CreateWindowEx(...); Test to make sure the hwnd was created and if not return FALSE Show the window and update the window That's all there is to initialization. Now on to the Windowproc function. All that the WindowProc function does is test for Windows messages to find out what's going on in the application. You will test for keystates(until you write DirectInput functions) in the WM_KEYDOWN case and you will shutdown DirectX components and Release COM objects in the WM_DESTROY case. Here is the function. long FAR PASCAL WindowProc( HWND hwnd, UINT message, 
+   		 	WPARAM wParam, LPARAM lParam )
+{
+	hWnd = hwnd;
+	switch( message )
+	{
+	/*
+ 	* this case says that our application either has the focus or it doesn't.  wParam is the
+ 	* message that is being sent by the application if we have the focus, bActive is TRUE, 
+ 	* otherwise it's FALSE
+ 	*/
+	case WM_ACTIVATEAPP:
+    	bActive = wParam;
+    	break;
+
+	/* 
+ 	* turn the cursor off by setting it's value to NULL
+ 	*/
+	case WM_SETCURSOR:
+    	SetCursor(NULL);
+    	return TRUE;
+
+	case WM_CREATE:
+    	break;
+
+	/*
+ 	* test your key states in this case
+ 	*/
+	case WM_KEYDOWN:
+    	switch( wParam )
+    	{
+    	case VK_ESCAPE:
+    	case VK_F12:
+        	PostMessage(hwnd,WM_CLOSE,0,0);
+        	break;
+    	}
+    	break;
+   	 
+	/*
+ 	* this case is touched when the application is shutting down
+ 	*/
+	case WM_DESTROY:
+    	/* you will shut down your game here. */
+
+    	PostQuitMessage( 0 );
+    	break;
+	}
+
+	return DefWindowProc(hwnd, message, wParam, lParam);
+
+} /* WindowProc */ Now we move on to WinMain. WinMain is the Main() of a Win32 program. This will contain our main loop in which we will run the main game logic. Lets take a look at it. /*
+ * WinMain - initialization, message loop
+ */
+int PASCAL WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
+                	LPSTR lpCmdLine, int nCmdShow)
+{
+	MSG msg;
+
+	if( !doInit( hInstance, nCmdShow ) )
+	{
+    	return FALSE;
+	}
+
+	/* this is the main windows loop for our application */
+	while( 1 )
+	{
+    	if( PeekMessage( &msg, NULL, 0, 0, PM_NOREMOVE ) )
+    	{
+        	if( !GetMessage( &msg, NULL, 0, 0 ) )
+            	return msg.wParam;
+        	TranslateMessage(&msg); 
+        	DispatchMessage(&msg);
+    	}
+
+    	/* if the application has the focus */
+    	else if( bActive )
+    	{
+        	/*
+         	* right here is where we process our game logic.  We process it here so that we don't
+         	* unnecessarily update the game loop.  We don't want to update if another application
+         	* has the focus because we don't need to
+         	*/
+    	}
+    	else
+    	{
+        	WaitMessage();
+    	}
+	}
+} /* WinMain */ That is all you need to know to create a window to get started with DirectX. Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Understanding the Windows Aspect of DirectX English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

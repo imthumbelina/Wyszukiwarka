@@ -1,0 +1,431 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » OpenGL » Article: OpenGL Batch Rendering Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This BVH File Loading and Displaying Introduction to Game Programming with CUDA Useless Snippet #2: AABB/Frustum test How to Work with FBX SDK Configuration And Tweaking Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 4 Like 12Likes Dislike OpenGL Batch Rendering By Marek Krzeminski | Published Nov 23 2014 12:45 AM in OpenGL Peer Reviewed by (Eck, jbadams, Josh Vega) batch render opengl degenerate vbo triangle strips batching rendering manager Hide Over the last 10+ years I have created many different game engines to suit my needs. In this article I describe the batch rendering technique that I use in the OpenGL Shader Engine that I am building right now. If you are interested in seeing more details on the OpenGL Shader Engine that I’m making, have a look at my website http://www.marekknows.com/downloads.php?vmk=shader What is Batch Rendering? Every game engine needs to generate data using the Central Processing Unit (CPU) on your motherboard, and then transfer this data over to the Graphics Processing Unit (GPU) on your video card so that it can render things to the screen. When rendering different data objects, it is best to organize the data in groups so that you minimize the number of calls from the CPU to the GPU. You also want to minimize the number of state changes which can kill your game’s performance. The group that holds the data to be rendered is called a batch. How to Create a Batch? In OpenGL a batch is defined by creating a Vertex Buffer Object (VBO). For details on creating a VBO and some best practises have a look here: https://www.opengl.org/wiki/Vertex_Specification_Best_Practices I defined a Batch class the following way in C++: 
+class Batch sealed {
+public:
+private:
+	unsigned	_uMaxNumVertices;
+	unsigned	_uNumUsedVertices;
+	unsigned	_vao; //only used in OpenGL v3.x +
+	unsigned	_vbo;
+	BatchConfig _config;
+	GuiVertex   _lastVertex;
+
+//^^^^------ variables above ------|------ functions below ------vvvv
+
+public:
+	Batch(unsigned uMaxNumVertices ); 
+	~Batch();
+
+	bool   isBatchConfig( const BatchConfig& config ) const;
+	bool   isEmpty() const;
+	bool   isEnoughRoom( unsigned uNumVertices ) const;
+	Batch* getFullest( Batch* pBatch );
+	int    getPriority() const;
+
+	void add( const std::vector<GuiVertex>& vVertices, const BatchConfig& config );
+	void add( const std::vector<GuiVertex>& vVertices );
+	void render();
+
+protected:
+private:
+	Batch( const Batch& c ); //not implemented
+	Batch& operator=( const Batch& c ); //not implemented
+
+	void cleanUp();
+
+};//Batch
+ Notice that a Batch keeps track of how many vertices can be stored inside it (_uMaxNumVertices), as well as how many vertices are actually used in this batch (_uNumUsedVertices). A VBO is constructed to actually store the vertices on the GPU when a Batch is created. Each Batch can only store a particular set of vertices as defined in the BatchConfig. A BatchConfig is defined this way: 
+struct BatchConfig {
+	unsigned  uRenderType;
+	int       iPriority;
+	unsigned  uTextureId;
+	glm::mat4 transformMatrix; //initialized as identity matrix
+
+	BatchConfig( unsigned uRenderTypeIn, int iPriorityIn, unsigned uTextureIdIn ) :
+		uRenderType( uRenderTypeIn ),
+		iPriority( iPriorityIn ),
+		uTextureId( uTextureIdIn )
+	{}
+
+	bool operator==( const BatchConfig& other) const {
+		if( uRenderType		!= other.uRenderType ||
+			iPriority		!= other.iPriority ||
+			uTextureId		!= other.uTextureId ||
+			transformMatrix != other.transformMatrix ) 
+		{
+			return false;
+		}
+		return true;
+	}
+
+	bool operator!=( const BatchConfig& other) const {
+		return !( *this == other );
+	}
+};//BatchConfig
+ A BatchConfig defines how the vertices should be interpreted (uRenderType); be it a set of GL_LINES, set of GL_TRIANGLES, or a set of GL_TRIANGLE_STRIPS. The iPriority value indicates which order Batches should be rendered in. A higher priority value indicates that the Batch of vertices will appear on top of another Batch that has a lower priority. If vertices stored in a Batch have texture coordinates, then we need to know which texture to use (uTextureId). Lastly, if the vertices need to be transformed before being rendered, then their transformMatrix will contain a non-identity matrix. In this example I will be working with vertices defined this way: 
+struct GuiVertex {
+	glm::vec2 position;
+	glm::vec4 color;
+	glm::vec2 texture;
+
+	GuiVertex( glm::vec2 positionIn, glm::vec4 colorIn, glm::vec2 textureIn = glm::vec2() ) :
+		position( positionIn ),
+		color( colorIn ),
+		texture( textureIn )
+	{}
+};//GuiVertex
+ Notice that the GuiVertex defines a 2D coordinate on the screen that can contain a color and a texture coordinate. The member functions in the Batch class are used to add vertices to a Batch and also render them when the appropriate time to do so has been reached. The implementation of the Batch class is shown below. 
+Batch::Batch( unsigned uMaxNumVertices ) :
+	_uMaxNumVertices( uMaxNumVertices ),
+	_uNumUsedVertices( 0 ),
+	_vao( 0 ),
+	_vbo( 0 ),
+	_config( GL_TRIANGLE_STRIP, 0, 0 ),
+	_lastVertex( glm::vec2(), glm::vec4() )
+{
+
+	//optimal size for a batch is between 1-4MB in size.  Number of elements that can be stored in a 
+	//batch is determined by calculating #bytes used by each vertex
+	if( uMaxNumVertices < 1000 ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " uMaxNumVertices{" << uMaxNumVertices << "} is too small.  Choose a number >= 1000 ";
+		throw ExceptionHandler( strStream );
+	}
+
+	//clear error codes
+	glGetError();
+	
+	if( Settings::getOpenglVersion().x >= 3 ) {
+		glGenVertexArrays( 1, &_vao );
+		glBindVertexArray( _vao );  
+	}
+
+	//create batch buffer
+	glGenBuffers( 1, &_vbo ); 
+	glBindBuffer( GL_ARRAY_BUFFER, _vbo ); 
+	glBufferData( GL_ARRAY_BUFFER, uMaxNumVertices * sizeof( GuiVertex ), nullptr, GL_STREAM_DRAW );
+
+	if( Settings::getOpenglVersion().x >= 3 ) {
+		unsigned uOffset = 0;
+		ShaderManager::enableAttribute( A_POSITION, sizeof( GuiVertex ), uOffset );
+		uOffset += sizeof( glm::vec2 ); 
+		ShaderManager::enableAttribute( A_COLOR, sizeof( GuiVertex ), uOffset );
+		uOffset += sizeof( glm::vec4 ); 
+		ShaderManager::enableAttribute( A_TEXTURE_COORD0, sizeof( GuiVertex ), uOffset );
+	
+		glBindVertexArray( 0 );
+
+		ShaderManager::disableAttribute( A_POSITION );
+		ShaderManager::disableAttribute( A_COLOR );
+		ShaderManager::disableAttribute( A_TEXTURE_COORD0 );
+	}
+
+	glBindBuffer( GL_ARRAY_BUFFER, 0 ); 
+
+	if( GL_NO_ERROR != glGetError() ) {
+		cleanUp();	
+		throw ExceptionHandler( __FUNCTION__ + std::string( " failed to create batch" ) );
+	}
+}//Batch
+
+//------------------------------------------------------------------------
+Batch::~Batch() {
+	cleanUp();
+}//~Batch
+
+//------------------------------------------------------------------------
+void Batch::cleanUp() {
+	if( _vbo != 0 ) {
+		glBindBuffer( GL_ARRAY_BUFFER, 0 );
+		glDeleteBuffers( 1, &_vbo );
+		_vbo = 0;
+	}
+	if( _vao != 0 ) {
+		glBindVertexArray( 0 );
+		glDeleteVertexArrays( 1, &_vao );
+		_vao = 0;
+	}
+}//cleanUp
+
+//------------------------------------------------------------------------
+bool Batch::isBatchConfig( const BatchConfig& config ) const {
+	return ( config == _config );
+}//isBatchConfig
+
+//------------------------------------------------------------------------
+bool Batch::isEmpty() const {
+	return ( 0 == _uNumUsedVertices );
+}//isEmpty
+
+//------------------------------------------------------------------------
+//returns true if the number of vertices passed in can be stored in this batch
+//without reaching the limit of how many vertices can fit in the batch
+bool Batch::isEnoughRoom( unsigned uNumVertices ) const {
+	//2 extra vertices are needed for degenerate triangles between each strip
+	unsigned uNumExtraVertices = ( GL_TRIANGLE_STRIP == _config.uRenderType && _uNumUsedVertices > 0 ? 2 : 0 );
+
+	return ( _uNumUsedVertices + uNumExtraVertices + uNumVertices <= _uMaxNumVertices );		
+}//isEnoughRoom
+
+//------------------------------------------------------------------------
+//returns the batch that contains the most number of stored vertices between
+//this batch and the one passed in
+Batch* Batch::getFullest( Batch* pBatch ) {
+	return ( _uNumUsedVertices > pBatch->_uNumUsedVertices ? this : pBatch );
+}//getFullest
+
+//------------------------------------------------------------------------
+int Batch::getPriority() const {
+	return _config.iPriority;
+}//getPriority
+
+//------------------------------------------------------------------------
+//adds vertices to batch and also sets the batch config options
+void Batch::add( const std::vector<GuiVertex>& vVertices, const BatchConfig& config ) {
+	_config = config;
+	add( vVertices );
+}//add
+
+//------------------------------------------------------------------------
+void Batch::add( const std::vector<GuiVertex>& vVertices ) {
+	//2 extra vertices are needed for degenerate triangles between each strip
+	unsigned uNumExtraVertices = ( GL_TRIANGLE_STRIP == _config.uRenderType && _uNumUsedVertices > 0 ? 2 : 0 );
+	if( uNumExtraVertices + vVertices.size() > _uMaxNumVertices - _uNumUsedVertices ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " not enough room for {" << vVertices.size() << "} vertices in this batch.  Maximum number of vertices allowed in a batch is {" << _uMaxNumVertices << "} and {" << _uNumUsedVertices << "} are already used"; 
+		if( uNumExtraVertices > 0 ) {
+			strStream << " plus you need room for {" << uNumExtraVertices << "} extra vertices too";
+		}
+		throw ExceptionHandler( strStream );
+	}
+	if( vVertices.size() > _uMaxNumVertices ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " can not add {" << vVertices.size() << "} vertices to batch.  Maximum number of vertices allowed in a batch is {" << _uMaxNumVertices << "}"; 
+		throw ExceptionHandler( strStream );
+	}
+	if( vVertices.empty() ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " can not add {" << vVertices.size() << "} vertices to batch."; 
+		throw ExceptionHandler( strStream );
+	}
+
+	//add vertices to buffer
+	if( Settings::getOpenglVersion().x >= 3 ) {
+		glBindVertexArray( _vao );
+	}
+	glBindBuffer( GL_ARRAY_BUFFER, _vbo );
+
+	if( uNumExtraVertices > 0 ) {
+		//need to add 2 vertex copies to create degenerate triangles between this strip
+		//and the last strip that was stored in the batch
+		glBufferSubData( GL_ARRAY_BUFFER,         _uNumUsedVertices * sizeof( GuiVertex ), sizeof( GuiVertex ), &_lastVertex );
+		glBufferSubData( GL_ARRAY_BUFFER, ( _uNumUsedVertices + 1 ) * sizeof( GuiVertex ), sizeof( GuiVertex ), &vVertices[0] );
+	}
+
+	// Use glMapBuffer instead, if moving large chunks of data > 1MB
+	glBufferSubData( GL_ARRAY_BUFFER, ( _uNumUsedVertices + uNumExtraVertices ) * sizeof( GuiVertex ), vVertices.size() * sizeof( GuiVertex ), &vVertices[0] );
+	
+	if( Settings::getOpenglVersion().x >= 3 ) {
+		glBindVertexArray( 0 );
+	}
+	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+
+	_uNumUsedVertices += vVertices.size() + uNumExtraVertices;
+
+	_lastVertex = vVertices[vVertices.size() - 1];
+
+}//add
+
+//------------------------------------------------------------------------
+void Batch::render() {
+	if( _uNumUsedVertices == 0 ) {
+		//nothing in this buffer to render
+		return;
+	}
+
+	bool usingTexture = INVALID_UNSIGNED != _config.uTextureId;
+	ShaderManager::setUniform( U_USING_TEXTURE, usingTexture );
+	if( usingTexture ) {
+		ShaderManager::setTexture( 0, U_TEXTURE0_SAMPLER_2D, _config.uTextureId ); 
+	}
+
+	ShaderManager::setUniform( U_TRANSFORM_MATRIX, _config.transformMatrix );
+
+	//draw contents of buffer
+	if( Settings::getOpenglVersion().x >= 3 ) {
+		glBindVertexArray( _vao );
+		glDrawArrays( _config.uRenderType, 0, _uNumUsedVertices );
+		glBindVertexArray( 0 );		
+
+	} else { //OpenGL v2.x
+		glBindBuffer( GL_ARRAY_BUFFER, _vbo );
+
+		unsigned uOffset = 0;
+		ShaderManager::enableAttribute( A_POSITION, sizeof( GuiVertex ), uOffset );
+		uOffset += sizeof( glm::vec2 ); 
+		ShaderManager::enableAttribute( A_COLOR, sizeof( GuiVertex ), uOffset );
+		uOffset += sizeof( glm::vec4 ); 
+		ShaderManager::enableAttribute( A_TEXTURE_COORD0, sizeof( GuiVertex ), uOffset );
+	
+		glDrawArrays( _config.uRenderType, 0, _uNumUsedVertices );		
+
+		ShaderManager::disableAttribute( A_POSITION );
+		ShaderManager::disableAttribute( A_COLOR );
+		ShaderManager::disableAttribute( A_TEXTURE_COORD0 );
+
+		glBindBuffer( GL_ARRAY_BUFFER, 0 );
+	}
+	
+	//reset buffer
+	_uNumUsedVertices = 0;
+	_config.iPriority = 0;
+
+}//render
+ As mentioned earlier, a Batch can contain vertices for only one specific uRenderType at a time. If you are adding vertices to a Batch that uses GL_LINES or GL_TRIANGLES, then what you put into the batch by calling Batch.add is exactly what you get in the VBO. However if you are adding vertices defined as GL_TRIANGLE_STRIPS then we need to add some degenerate triangles between each strip so that by the time a call to Batch.render is made, we can reconstruct the original set of triangle strips that we wanted without having all the triangle strips automatically join together to one another. See this for details: http://en.wikipedia.org/wiki/Triangle_strip How to Use the Batch Class? I have shown you how to create a Batch, so now let’s look at how to organize multiple Batches in a Game Engine. To do that we need a BatchManager: 
+class BatchManager sealed {
+public:
+private:
+	std::vector<std::shared_ptr<Batch>> _vBatches;
+
+	unsigned _uNumBatches;
+	unsigned _maxNumVerticesPerBatch;
+
+//^^^^------ variables above ------|------ functions below ------vvvv
+
+public:
+	BatchManager( unsigned uNumBatches, unsigned numVerticesPerBatch ); 
+	~BatchManager(); 
+
+	void render( const std::vector<GuiVertex>& vVertices, const BatchConfig& config );
+	void emptyAll();
+
+protected:
+private:
+	BatchManager( const BatchManager& c ); //not implemented
+	BatchManager& operator=( const BatchManager& c ); //not implemented
+	
+	void emptyBatch( bool emptyAll, Batch* pBatchToEmpty ); 
+
+};//BatchManager
+ The BatchManager class is responsible for keeping a pool of batches (_vBatches). When BatchManager.render is called from the Game Engine, it will figure out which Batch should be used for the incoming vertices (vVertices) using the BatchConfig specified. If a Batch doesn’t get filled all the way, then the vertices will be held on until a later time when they have to be rendered, or when the BatchManager.emptyAll function is called. My implementation of the BatchManager is shown below: 
+BatchManager::BatchManager( unsigned uNumBatches, unsigned numVerticesPerBatch ) :
+	_uNumBatches( uNumBatches ),
+	_maxNumVerticesPerBatch( numVerticesPerBatch )
+{
+	//test input parameters
+	if( uNumBatches < 10 ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " uNumBatches{" << uNumBatches << "} is too small.  Choose a number >= 10 ";
+		throw ExceptionHandler( strStream );
+	}
+
+	//a good size for each batch is between 1-4MB in size.  Number of elements that can be stored in a 
+	//batch is determined by calculating #bytes used by each vertex
+	if( numVerticesPerBatch < 1000 ) {
+		std::ostringstream strStream;
+		strStream << __FUNCTION__ << " numVerticesPerBatch{" << numVerticesPerBatch << "} is too small.  Choose a number >= 1000 ";
+		throw ExceptionHandler( strStream );
+	}
+
+	//create desired number of batches
+	_vBatches.reserve( uNumBatches );
+	for( unsigned u = 0; u < uNumBatches; ++u ) {
+		_vBatches.push_back( std::shared_ptr<Batch>( new Batch( numVerticesPerBatch ) ) );
+	}	
+
+}//BatchManager
+
+//------------------------------------------------------------------------
+BatchManager::~BatchManager() {
+	_vBatches.clear();	
+}//~BatchManager
+
+//------------------------------------------------------------------------
+void BatchManager::render( const std::vector<GuiVertex>& vVertices, const BatchConfig& config ) {
+	Batch* pEmptyBatch   = nullptr;
+	Batch* pFullestBatch = _vBatches[0].get();
+
+	//determine which batch to put these vertices into
+	for( unsigned u = 0; u < _uNumBatches; ++u ) {
+		Batch* pBatch = _vBatches[u].get();
+
+		if( pBatch->isBatchConfig( config ) ) {
+			if( !pBatch->isEnoughRoom( vVertices.size() ) ) {
+				//first need to empty this batch before adding anything to it
+				emptyBatch( false, pBatch );
+			}
+			pBatch->add( vVertices );
+			return;
+		}
+
+		//store pointer to first empty batch
+		if( nullptr == pEmptyBatch && pBatch->isEmpty() ) {
+			pEmptyBatch = pBatch;
+		}
+
+		//store pointer to fullest batch
+		pFullestBatch = pBatch->getFullest( pFullestBatch );		
+	}
+	
+	//if we get here then we didn't find an appropriate batch to put the vertices into
+	//if we have an empty batch, put vertices there
+	if( nullptr != pEmptyBatch ) {
+		pEmptyBatch->add( vVertices, config );
+		return;
+	}
+
+	//no empty batches were found therefore we must empty one first and then we can use it
+	emptyBatch( false, pFullestBatch );
+	pFullestBatch->add( vVertices, config );
+
+}//render
+
+//------------------------------------------------------------------------
+//empty all batches by rendering their contents now
+void BatchManager::emptyAll() {
+	emptyBatch( true, _vBatches[0].get() );	
+}//emptyAll
+
+//------------------------------------------------------------------------
+struct CompareBatch : public std::binary_function<Batch*, Batch*, bool> {
+	bool operator()( const Batch* pBatchA, const Batch* pBatchB ) const {
+		return ( pBatchA->getPriority() > pBatchB->getPriority() ); 
+    }//operator()
+};//CompareBatch
+
+//------------------------------------------------------------------------
+//empties the batches according to priority.  If emptyAll is false then
+//only empty the batches that are lower priority than the one specified
+//AND also empty the one that is passed in
+void BatchManager::emptyBatch( bool emptyAll, Batch* pBatchToEmpty ) {
+	//sort batches by priority
+	std::priority_queue<Batch*, std::vector<Batch*>, CompareBatch> queue;
+
+	for( unsigned u = 0; u < _uNumBatches; ++u ) {
+		//add all non-empty batches to queue which will be sorted by order
+		//from lowest to highest priority
+		if( !_vBatches[u]->isEmpty() ) {
+			if( emptyAll ) {
+				queue.push( _vBatches[u].get() );
+
+			} else if( _vBatches[u]->getPriority() < pBatchToEmpty->getPriority() ) {
+				//only add batches that are lower in priority
+				queue.push( _vBatches[u].get() );
+			}
+		}
+	}
+
+	//render all desired batches
+	while( !queue.empty() ) {
+		Batch* pBatch = queue.top();
+		pBatch->render();
+		queue.pop();
+	}
+	if( !emptyAll ) {
+		//when not emptying all the batches, we still want to empty
+		//the batch that is passed in, in addition to all batches
+		//that have lower priority than it
+		pBatchToEmpty->render();
+	}
+
+}//emptyBatch
+ During each render frame in the Game Engine, call the BatchManager.render function when you need some vertices sent to the GPU. At the end of the frame rendering routine, call BatchManager.emptyAll to make sure you clear out any remaining Batches that the BatchManager may still be holding on to. Things to Keep in Mind This article focuses on grouping 2D vertices using the BatchConfig defined for each set of vertices. The iPriority value can be thought of as a Z-depth value for the objects defined by the GuiVertex data. A higher value indicates the object will be rendered on top of a lower values. If you want to extend the Batch class to support 3D data, you will need to change the definition of the iPriority value to represent the 3D meshes centroid's distance from the camera (or something similar) so that 3D objects are rendered from back to front with respect to the camera. I have only used the BatchManager with GL_LINES, GL_TRIANGLES and GL_TRIANGLE_STRIPS. If you want to support additional rendering types then you would need to update the Batch.add function to add the appropriate degenerate vertices between each set of vertices stored in the Batch. Conclusion The OpenGL Batch Rendering technique presented in this article focuses on creating a Batch class that holds a particular set of vertices, and a BatchManager class which is responsible for managing a pool of Batches. When a Game Engine wants to render some vertices, the BatchManager.render call is used to group the vertices using the BatchConfig defined for the GuiVertex objects passed in. The BatchManager.render call will automatically send Batches over to the GPU when it needs to or when BatchManager.emptyAll is called to flush all the Batches stored by the BatchManager. If you want to see the BatchManager in action, try out my free game called Zing which can be downloaded from here: http://www.marekknows.com/phpBB3/viewtopic.php?t=682 If you want to see more details of the OpenGL Shader Engine code that I use with the BatchManager, have a look at the following video tutorial series: http://www.marekknows.com/downloads.php?vmk=shader I would be happy to hear any comments or improvements you may have to this Batch Rendering technique. I'd like to extend the Batch Rendering to support 3D skeletal animation data, but I'm not sure what is the best way to do that so that the bone transformation can happen on the GPU rather than on the CPU. The Batches as they are defined right now depend on a transform matrix but that means that if I try to render a human, each limb would go into its own Batch, which means I would not get any performance gain by using the BatchManager as described in the article above. Can someone suggest how to do batch rendering that works with 3D skeletal animation data? I'm not clear about is how to batch render multiple skeletal animated characters at once. Is that even possible? How do people handle this or does everyone just send one skeletal model at a time to the GPU to render? Article Update Log 21 Nov 2014: Asking readers how to extend the BatchManager to support Skeletal Animation. 20 Nov 2014: Initial release About the Author(s) Marek has over 15 years of software development experience with medical, military, and consumer applications specializing in human-to-machine interfaces. He went to school at the University of Waterloo where he earned two Engineering degrees: a Bachelor of Applied Science in Electrical Engineering and a Master of Applied Science in Electrical and Computer Engineering, specialized in Robotics and Control. Marek enjoys making instructional video tutorials for game developers because it allows him to combine his three strong passions together: computer programming, the visual arts, and teaching. On the website www.MarekKnows.com you will find over 300 training videos to download. License GDOL (Gamedev.net Open License) Comments 4thworld Nov 20 2014 03:23 AM Hi, nice article. Did you tried to make a comparison between a non-batched version of the engine? if yes, how much was the performance gain?   We tried something similar with our engine and I experienced, with a lot of mid-high to low level graphics cards, to be really expensive rendering an object with one single big vertex buffer (>100 K) instead of using multiple small vertex buffers (~1K). The performances went down by a lot despite we weren't doing anything wrong (memory was ok etc..). Intel integrated graphics card won't even render an object with a huge vertex buffer. TheItalianJob71 Nov 20 2014 04:47 AM Thanks for sharing your code i was interested in batching too and your article comes at the right time , have you noticed any speed fluctuations using an aligned datat structure for vertices ?? i have noticed that aligning ( for example put extra data to reach byte alignement ) in the vertex sent to the card, improves the speed a little bit. unbird Nov 20 2014 05:40 AM Nice article. One suggestion, though: I'd make the batch generic for arbitrary vertex types. MarekKnows.com Nov 20 2014 07:26 AM Did you tried to make a comparison between a non-batched version of the engine? if yes, how much was the performance gain?     I'm still in the development stage of the Game Engine so I haven't done any performance testing with this yet.  I've made the BatchManager general enough so that I could increase the size of a Batch and change the number of batches once I do get to the stage of performance testing to fine tune things for each game that I make.   Nice article. One suggestion, though: I'd make the batch generic for arbitrary vertex types.   Are you suggesting templating the Batch class to hold different types of vertices?  That's a good idea. unbird Nov 20 2014 09:10 AM Precisely. MarekKnows.com Nov 21 2014 03:52 PM <added comment to Conclusion section of this article> unbird Nov 22 2014 06:02 AM You mean the question about batching skinned meshes ? Why not start a topic in the graphics or OpenGL forum and link back and forth here I don't think it's convenient to batch different meshes, but instancing works. I did something like this with D3D11. The matrix palette size multiplies with the number of instances, and in the vertex shader you select the the matrix using instanceID * BONESPERINSTANCE + boneID. Not like vertex buffer batching, but rather concatenating arrays and feed a constant buffer (IIRC UBOs in GL). There's a limit, but one can break it using a different approach (texture buffers in D3D). If this is convenient or more performant is a different question. MarekKnows.com Nov 23 2014 07:29 AM Started a discussion here:http://www.gamedev.net/topic/663061-is-it-possible-to-do-batch-rendering-with-3d-skeletal-animation-data/ IceCave Nov 26 2014 05:33 PM Is this a common technique also used by other developer studios? I was just wondering if updating the vertices everytime on the GPU before every draw-call might be a big bottleneck again. Or did I misunderstood and you are rearranging the VBAs in the VBOs? I am confused.   I have to admit that I never used VBO's as most OpenGL ES devices still do not support ES3.0 sadly, so also do our test devices. MarekKnows.com Nov 26 2014 06:09 PM I can't speak about what other studios do, but batching your render calls is always a good idea.  There was a good presentation from nVidia at a game developers conference a number of years ago which gave a good summary of the improvements gained by batching render calls.  Have a read here: http://www.nvidia.com/docs/IO/8228/BatchBatchBatch.pdf Prune Dec 12 2014 03:14 PM Is there any reason you're not using multi-draw indirect? With that, you can do a single draw call per shader. What I do is pack all of a given type of vertex attribute for all meshes in a single VBO (I don't interleave because most passes only need positions: the shadow map passes and the z-prepass), then I build a separate command buffer for each <shader,draw-call> pair. Transforms and material properties, including bindless texture handles, are in other buffers that the shader indexes by indirectionBuffer[gl_DrawIDARB], and those that change can be written into persistently mapped buffers. The render thread then becomes very simple:   Init: persistently map all dynamic buffers; initial glFenceSync()   bool newSync(false): if (new dynamic update data available) { glClientWaitSync(...); copy data (whatever's changed of transforms, material parameters, texture handles, indirection buffer, draw command buffer) into triple buffer to begin DMA transfer increment indexes newSync = true; } ... if (newSync) glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT); bind shadow shader, disable color writes for each shadow-casting light, bind render target and glMultiDrawElementsIndirectCountARB(...) bind z-prepass shader glMultiDrawElementsIndirectCountARB(...) enable color writes for each shading pass, set state, bind shader, and glMultiDrawElementsIndirectCountARB(...) if (newSync) syncs[index] = glFenceSync(); for each postporcess pass, bind shader and glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // No VAO/VBO bound, just use gl_VertexID to index constant array in shader   The update data is created by the compute threads; I only do interpolation based on timestamp on the render thread to avoid jitter, as the compute threads run asynchronously. MarekKnows.com Dec 12 2014 03:45 PM The hardware that I target only supports OpenGL v2 or 3, so that is why I'm not using glMultiDrawElementsIndirect Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » OpenGL » Article: OpenGL Batch Rendering English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

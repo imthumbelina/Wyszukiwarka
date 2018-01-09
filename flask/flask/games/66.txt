@@ -1,0 +1,116 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » DirectX and XNA » Article: How to parse .X files Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Building an .X File Frame Hierarchy Implementing Skin Meshes with DirectX 8 Loading and displaying .X files without DirectX Getting Started with Templates Direct3D 7 Immediate Mode Framework Programming 4: Building Worlds with X Files Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 1 Like 0Likes Dislike How to parse .X files By Jim Adams | Published Sep 13 2001 05:44 PM in DirectX and XNA template templates file object function return you' found null Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource Copyright © 2001 by Jim Adams. All rights reserved. One of the greatest, and most confusing, additions to Direct3D is that of skinned meshes. These miraculous mesh marvels allow the user to dynamically deform a mesh in order to produce animation. Unfortunately, Microsoft screwed the pooch when it came time to effectively demonstrate and document the use of skinned meshes. As you can tell from the title of this article, I'm not here to tackle the subject of skinned meshes, but rather to build a base of understanding of the file format you're most likely to use when dealing with skinned meshes: .X files. To be more precise, I'm only going to show you how to parse an .X file; specifically how to read in the data contained within an .X file. Now don't throw your hands up in the air asking what good this does you! In fact, understanding how to parse an .X file template by template is the first big step you'll take to loading and using skinned meshes. The .X File Objects DirectX comes with a set of objects that have the sole responsibility of dealing with .X files. This functionality includes opening the .X files, enumerating contained templates, and saving templates. Those objects we're most interested in at this point are: IDirectXFile The main object that opens an .X file for use. IDirectXFileEnumObject An object that enumerates templates within an .X file. IDirectXFileData An object that represents the data contained with a template. IDirectXFileObject A minor object that represents data within an .X file. IDirectXFileDataReference The object used to resolve template references contained within .X files. Note that in order to use the family of DirectX file objects, you'll have to include dxfile.h into your project, as well as linking to the d3dx8of.lib library. Make sure to also link with dxguid.lib to make sure your GUID's are defined for you! Parsing in two easy functions Well, you've met the gang of objects and now it's time to put them to work. I'm going to give you two quick and easy functions that does all the work for you of parsing .X files. The first function, called ParseXFile, is the only one you will call directly (a public callable function if you will). The ParseXFile function has the job of initializing the IDirectXFile object, which in turns opens the specified .X file. From there, you have to register a list of templates you expect to find within the .X file; this list is contained within a series of headers provided with Direct3D. Next, the ParseXFile function will create an enumeration object (IDirectXFileEnumObject) that begins scanning through the top-most templates. As each top-level template is found, it is passed to the second function, ParseXFileData. Once all top-level templates are parsed, all DirectX file objects are released and execution returns to the calling function. The ParseXFileData function does the majority of the work here. It retrieves the GUID of the currently enumerated template, as well the specified template instance name (if any name was provided). From there, you'll come in and see what to do with the template (based on its GUID). In the sample code provided with this article, I have listed a few standard Direct3D templates you're bound to use. Moving on, the ParseXFileData function then scans for sub-templates; that is, templates that are embedded within other templates. This process takes into account that some templates are merely references to template instances defined elsewhere in the .X file, and as such, the references are resolved and parsed. As each sub-template is found, it is recursively passed to the ParseXFileData function to parse. This process continues until all sub-templates are parsed and execution returns to the ParseXFile function. I really don't have the time or space to show you the breakdown of every DirectX file object and their respective interfaces, but rather I have fully commented the code to help you understand what's going on. So without further ado, here's the code for the two functions: BOOL ParseXFile(char *Filename)
+{
+  IDirectXFile   		*pDXFile = NULL;
+  IDirectXFileEnumObject *pDXEnum = NULL;
+  IDirectXFileData   	*pDXData = NULL;
+
+  // Create the .X file object
+  if(FAILED(DirectXFileCreate(&pDXFile)))
+	return FALSE;
+
+  // Register the templates in use
+  // Use the standard retained mode templates from Direct3D
+  if(FAILED(pDXFile->RegisterTemplates((LPVOID)D3DRM_XTEMPLATES, D3DRM_XTEMPLATE_BYTES))) {
+	pDXFile->Release();
+	return FALSE;
+  }
+
+  // Create an enumeration object
+  if(FAILED(pDXFile->CreateEnumObject((LPVOID)Filename, DXFILELOAD_FROMFILE, &pDXEnum))) {
+	pDXFile->Release();
+	return FALSE;
+  }
+
+  // Enumerate all top-level templates
+  while(SUCCEEDED(pDXEnum->GetNextDataObject(&pDXData))) {
+	ParseXFileData(pDXData);
+	ReleaseCOM(pDXData);
+  }
+
+  // Release objects
+  ReleaseCOM(pDXEnum);
+  ReleaseCOM(pDXFile);
+
+  // Return a success
+  return TRUE;
+}
+
+void ParseXFileData(IDirectXFileData *pData)
+{
+  IDirectXFileObject *pSubObj  = NULL;
+  IDirectXFileData   *pSubData = NULL;
+  IDirectXFileDataReference *pDataRef = NULL;
+  const GUID *pType = NULL;
+  char   	*pName = NULL;
+  DWORD   	dwSize;
+  char   	*pBuffer;
+  
+  // Get the template type
+  if(FAILED(pData->GetType(&pType)))
+	return;
+
+  // Get the template name (if any)
+  if(FAILED(pData->GetName(NULL, &dwSize)))
+	return;
+  if(dwSize) {
+	if((pName = new char[dwSize]) != NULL)
+  	pData->GetName(pName, &dwSize);
+  }
+
+  // Give template a default name if none found
+  if(pName == NULL) {
+	if((pName = new char[9]) == NULL)
+  	return;
+	strcpy(pName, "Template");
+  }
+
+  // See what the template was and deal with it
+  // This is where you'll jump in with your own code
+
+  if(*pType == TID_D3DRMFrame) {
+	MessageBox(NULL, pName, "Frame template found", MB_OK);
+  }
+
+  if(*pType == TID_D3DRMMesh) {
+	MessageBox(NULL, pName, "Mesh template found", MB_OK);
+  }
+
+  if(*pType == TID_D3DRMMaterial) {
+	MessageBox(NULL, pName, "Material template found", MB_OK);
+  }
+
+  if(*pType == TID_D3DRMFrameTransformMatrix) {
+	MessageBox(NULL, pName, "Frame transformation matrix template found", MB_OK);
+
+	// Get the template data
+	if(FAILED(pData->GetData(NULL, &dwSize, (PVOID*)&pBuffer)))
+  	return;
+
+	// Do whatever with data. Note that you can cast
+	// the pointer to anything. Be sure to copy data 
+	// out of buffer before proceeding.
+   }
+
+  // Scan for embedded templates
+  while(SUCCEEDED(pData->GetNextObject(&pSubObj))) {
+
+	// Process embedded references
+	if(SUCCEEDED(pSubObj->QueryInterface(IID_IDirectXFileDataReference, (void**)&pDataRef))) {
+  	if(SUCCEEDED(pDataRef->Resolve(&pSubData))) {
+    	ParseXFileData(pSubData);
+    	ReleaseCOM(pSubData);
+  	}
+  	ReleaseCOM(pDataRef);
+	}
+
+	// Process non-referenced embedded templates
+	if(SUCCEEDED(pSubObj->QueryInterface(IID_IDirectXFileData, (void**)&pSubData))) {
+  	ParseXFileData(pSubData);
+  	ReleaseCOM(pSubData);
+	}
+	ReleaseCOM(pSubObj);
+  }
+
+  // Release name buffer
+  delete pName;
+} What to do from here You may be asking, "What do I do with those two functions?" You can see I quickly added a few statements in there to check for a couple standard templates, and to display a message box informing you when those templates are found. All you have to do is provide the ParseXFile function with an .X file to work with. Go ahead and check out the accompanying demo that comes with this article for a short example of using the two functions. To get back to the original points I made when I first started the article, parsing .X files is essential to working with skinned meshes. By tracking the frame templates as they are parsed, you're able to construct a frame hierarchy, which is used to create the underlying bone structure required for skinned meshes. Once a mesh template is encountered, you can then utilize the D3DXLoadMeshFromXof or D3DXLoadSkinMeshFromXof set of functions to load the mesh data into a useable object. Consult the DX SDK documents for more information on those two functions. Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » DirectX and XNA » Article: How to parse .X files English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

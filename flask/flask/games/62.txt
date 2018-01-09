@@ -1,0 +1,406 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: BVH File Loading and Displaying Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This How to Work with FBX SDK OpenGL Batch Rendering Basic OpenAL sound manager for your project Skinned Mesh Animation Using Matrices A Closer Look At Parallax Occlusion Mapping Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 6 Like 15Likes Dislike BVH File Loading and Displaying By Edin Mujagic | Published Aug 09 2013 01:11 PM in Game Programming Peer Reviewed by (Josh Vega, ivan.spasov, Dave Hunt) opengl c++ bvh Hide In this article we will look at the most common motion capture format: BVH. BVH is an acronym that stands for BioVision Hierarchical data and is used for storing motion capture data. It is simple and easy to understand. We will write a simple class that can load, display and play data from the file. Codebase now available:https://github.com/edinmu/gamedev-bvh-loader-article BVH format Much about format can be found at these two links: http://www.cs.wisc.edu/graphics/Courses/cs-838-1999/Jeff/BVH.html‎ http://www.dcs.shef.ac.uk/intranet/research/resmes/CS0111.pdf‎ Basically, it has two parts HIERARCHY and MOTION. Like the names suggest those two parts contain just that: hierarchies of skeletons and motion data. Inside the hierarchy part we have a description of skeletons. Even if the format permits having multiple skeleton definitions, rarely it will contain more then one. Skeletons are defined by defining bones which themselves are defined with joints; meaning we define a skeleton by defining joints. But if an elbow joint is the child of a shoulder joint how do we know the length of the upper arm? By defining an offset. Lets look at an example: 
+HIERARCHY
+ROOT Hips
+{
+	OFFSET 0.00 0.00 0.00
+	CHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation
+	JOINT Chest
+	{
+		OFFSET 5.00 0.00 0.00
+		CHANNELS 3 Zrotation Xrotation Yrotation
+		End Site
+		{
+			OFFSET 0.00 5.00 0.00
+		}
+	}
+	JOINT Leg
+	{
+		OFFSET -5.0 0.0 0.0
+		CHANNELS 3 Zrotation Xrotation Yrotation
+		End Site
+		{
+			OFFSET 0.0 5.0 0.0
+		}
+	}
+}
+MOTION
+Frames:		2
+Frame Time: 0.033333
+ 0.00 0.00 0.00 0.00 0.00 0.00  0.00 0.00 0.00  0.00 0.00 0.00
+ 0.00 0.00 0.00 0.00 0.00 0.00  0.00 45.00 0.00  0.00 0.00 0.00
+ First joint of the hierarchy is a root joint so it is defined by using the keyword ROOT. Every other joint that is a descendant is defined using the JOINT keyword followed by the joint name. Special joints are End Site joints which are joints without any children or name. Contents of a joint are OFFSET and CHANNELS. We use an offset to know the length (or offset from) of bones between joints of a joint's parent and itself. Most commonly, a ROOT joint will have an offset of (0, 0, 0) (note these are, of course: x, y, z components). CHANNELS line defines the number of channels following which channels that MOTION parts contain animation data for. Again, the most common use is a ROOT joint that has 6 channels (xyz position and zxy rotation) while other joints will have 3. End Site joints don't have animation data so they do not need to have CHANNELS data. They only have an OFFSET so we know it's length. The MOTION part contains two lines (frames defining number of frames ... and frame time which is frame rate; bvh motion FPS = 1. / frame_time) followed by lines for each frame that has float data of each joint/channel(specified) combination beginning from parent to children nodes, just in same order they were specified in hierarchy part, from top to bottom. The example is dull and has all zeroes but you get the point. When we make the loader you can change values and play with it. Interpreting MOTION and actually changing joint positions is described later on. First, we'll do the loading. Code We will define a few structures we'll need for storing data: 
+#define Xposition 0x01
+#define Yposition 0x02
+#define Zposition 0x04
+#define Zrotation 0x10
+#define Xrotation 0x20
+#define Yrotation 0x40
+    
+typedef struct
+{
+    float x, y, z;
+} OFFSET;
+
+typedef struct JOINT JOINT;
+
+struct JOINT
+{
+    const char* name = NULL;        // joint name
+    JOINT* parent = NULL;           // joint parent
+    OFFSET offset;                  // offset data
+    unsigned int num_channels = 0;  // num of channels joint has
+    short* channels_order = NULL;   // ordered list of channels
+    std::vector<JOINT*> children;   // joint's children
+    glm::mat4 matrix;               // local transofrmation matrix (premultiplied with parents'
+    unsigned int channel_start = 0; // index of joint's channel data in motion array
+};
+
+typedef struct
+{
+    JOINT* rootJoint;
+    int num_channels;
+} HIERARCHY;
+
+typedef struct
+{
+    unsigned int num_frames;              // number of frames
+    unsigned int num_motion_channels = 0; // number of motion channels 
+    float* data = NULL;                   // motion float data array
+    unsigned* joint_channel_offsets;      // number of channels from beggining of hierarchy for i-th joint
+} MOTION;
+ Most of these parameters are self-explanatory. For each joint we need a list of children, local transformation matrix and channel order at least. Bvh class 
+class Bvh
+{
+    JOINT* loadJoint(std::istream& stream, JOINT* parent = NULL);
+    void loadHierarchy(std::istream& stream);
+    void loadMotion(std::istream& stream);
+public:
+    Bvh();
+    ~Bvh();
+
+    // loading 
+    void load(const std::string& filename);
+
+    /** Loads motion data from a frame into local matrices */
+    void moveTo(unsigned frame);
+
+    const JOINT* getRootJoint() const { return rootJoint; }
+    unsigned getNumFrames() const { return motionData.num_frames; }
+private:
+    JOINT* rootJoint;
+    MOTION motionData;
+};
+ This is a simple class and below are functions for loading: 
+void Bvh::load(const std::string& filename)
+{
+    std::fstream file;
+    file.open(filename.c_str(), std::ios_base::in);
+
+    if( file.is_open() )
+    {
+        std::string line;
+
+        while( file.good() )
+        {
+            file >> line;
+            if( trim(line) == "HIERARCHY" )
+                loadHierarchy(file);
+            break;
+        }
+
+        file.close();
+    }
+}
+
+void Bvh::loadHierarchy(std::istream& stream)
+{
+    std::string tmp;
+
+    while( stream.good() )
+    {
+        stream >> tmp;
+
+        if( trim(tmp) == "ROOT" )
+            rootJoint = loadJoint(stream);
+        else if( trim(tmp) == "MOTION" )
+            loadMotion(stream);
+    }
+}
+
+JOINT* Bvh::loadJoint(std::istream& stream, JOINT* parent)
+{
+    JOINT* joint = new JOINT;
+    joint->parent = parent;
+    
+    // load joint name
+    std::string* name = new std::string;
+    stream >> *name;
+    joint->name = name->c_str();
+
+    std::string tmp;
+    
+    // setting local matrix to identity
+    joint->matrix = glm::mat4(1.0);
+
+    static int _channel_start = 0;
+    unsigned channel_order_index = 0;
+    
+    while( stream.good() )
+    {
+        stream >> tmp;
+        tmp = trim(tmp);
+
+        // loading channels
+        char c = tmp.at(0);
+        if( c == 'X' || c == 'Y' || c == 'Z' )
+        {
+            if( tmp == "Xposition" )
+            {
+                joint->channels_order[channel_order_index++] = Xposition;
+            }
+            if( tmp == "Yposition" )
+            {
+                joint->channels_order[channel_order_index++] = Yposition;
+            }
+            if( tmp == "Zposition" )
+            {
+                joint->channels_order[channel_order_index++] = Zposition;
+            }
+
+            if( tmp == "Xrotation" )
+            {
+                joint->channels_order[channel_order_index++] = Xrotation;
+            }
+            if( tmp == "Yrotation" )
+            {
+                joint->channels_order[channel_order_index++] = Yrotation;
+            }
+            if( tmp == "Zrotation" )
+            {
+                joint->channels_order[channel_order_index++] = Zrotation;
+            }
+        }
+
+        if( tmp == "OFFSET" )
+        {
+            // reading an offset values
+            stream  >> joint->offset.x
+                    >> joint->offset.y
+                    >> joint->offset.z;
+        }
+        else if( tmp == "CHANNELS" )
+        {
+            // loading num of channels
+            stream >> joint->num_channels;
+
+            // adding to motiondata
+            motionData.num_motion_channels += joint->num_channels;
+
+            // increasing static counter of channel index starting motion section
+            joint->channel_start = _channel_start;
+            _channel_start += joint->num_channels;
+
+            // creating array for channel order specification
+            joint->channels_order = new short[joint->num_channels];
+
+        }
+        else if( tmp == "JOINT" )
+        {
+            // loading child joint and setting this as a parent
+            JOINT* tmp_joint = loadJoint(stream, joint);
+
+            tmp_joint->parent = joint;
+            joint->children.push_back(tmp_joint);
+        }
+        else if( tmp == "End" )
+        {
+            // loading End Site joint
+            stream >> tmp >> tmp; // Site {
+
+            JOINT* tmp_joint = new JOINT;
+
+            tmp_joint->parent = joint;
+            tmp_joint->num_channels = 0;
+            tmp_joint->name = "EndSite";
+            joint->children.push_back(tmp_joint);
+
+            stream >> tmp;
+            if( tmp == "OFFSET" )
+                stream >> tmp_joint->offset.x
+                       >> tmp_joint->offset.y
+                       >> tmp_joint->offset.z;
+
+            stream >> tmp;
+        }
+        else if( tmp == "}" )
+            return joint;
+
+    }
+}
+
+void Bvh::loadMotion(std::istream& stream)
+{
+    std::string tmp;
+
+    while( stream.good() )
+    {
+        stream >> tmp;
+
+        if( trim(tmp) == "Frames:" )
+        {
+            // loading frame number
+            stream >> motionData.num_frames;
+        }
+        else if( trim(tmp) == "Frame" )
+        {
+            // loading frame time
+            float frame_time;
+            stream >> tmp >> frame_time;
+
+            int num_frames   = motionData.num_frames;
+            int num_channels = motionData.num_motion_channels;
+
+            // creating motion data array
+            motionData.data = new float[num_frames * num_channels];
+
+            // foreach frame read and store floats
+            for( int frame = 0; frame < num_frames; frame++ )
+            {
+                for( int channel = 0; channel < num_channels; channel++)
+                {
+                    // reading float
+                    float x;
+                    std::stringstream ss;
+                    stream >> tmp;
+                    ss << tmp;
+                    ss >> x;
+
+                    // calculating index for storage
+                    int index = frame * num_channels + channel;
+                    motionData.data[index] = x;
+                }
+            }
+        }
+    }
+}
+ The loading code should be easy to read. load() calls loadHierarchy() which calls loadRoot() for root joint and loadMotion() when the time comes. loadJoint() loads joint and all those ifs just try to take care of channel ordering. loadMotion() just loads frame number and frame time, and then iterates through all channels, reads float, calculates where to store a float and stores it. This version does not support multiple hierarchies, which can be easily added. JOINT transformations If we imagine a simplified human skeleton, hand would be child of an arm and itself child of a shoulder etc... We can go all the way up to the root joint which can be, for example, hips (which it actually is in most files). In order to find out the absolute position of all of a root joint's descendents we'll have to apply the parent's transformation onto them. You probably know that this can be achieved using matrices. That's why we have a joint's "local transformation matrix". Basically, the transformation matrix is composed of rotation and translation parameters (BVH does not support bone scaling so we dont have one). This can be represented using a standard 4x4 matrix where translation parameters are present in the 4-th column. Note that OpenGL uses column-major ordering which looks just like the transponse of a row-major ordered matrix. Since OpenGL uses it GLSL uses it and also GLM which is based on GLSL which we use here. This is said because we need to know it and we'll need it later. The function that does the positioning is moveTo() and uses a static helper function defined inside the .cpp file (it cannot be used outside, and does not need to): 
+/** 
+	Calculates JOINT's local transformation matrix for 
+	specified frame starting index 
+*/
+static void moveJoint(JOINT* joint, MOTION* motionData, int frame_starts_index)
+{
+    // we'll need index of motion data's array with start of this specific joint
+    int start_index = frame_starts_index + joint->channel_start;
+
+    // translate indetity matrix to this joint's offset parameters
+    joint->matrix = glm::translate(glm::mat4(1.0),
+                                   glm::vec3(joint->offset.x,
+                                             joint->offset.y,
+                                             joint->offset.z));
+
+    // here we transform joint's local matrix with each specified channel's values
+    // which are read from motion data
+    for(int i = 0; i < joint->num_channels; i++)
+    {
+        // channel alias
+        const short& channel = joint->channels_order[i];
+
+        // extract value from motion data
+        float value = motionData->data[start_index + i];
+        
+        if( channel & Xposition )
+        {
+            joint->matrix = glm::translate(joint->matrix, glm::vec3(value, 0, 0));
+        }
+        if( channel & Yposition )
+        {
+            joint->matrix = glm::translate(joint->matrix, glm::vec3(0, value, 0));
+        }
+        if( channel & Zposition )
+        {
+            joint->matrix = glm::translate(joint->matrix, glm::vec3(0, 0, value));
+        }
+
+        if( channel & Xrotation )
+        {
+            joint->matrix = glm::rotate(joint->matrix, value, glm::vec3(1, 0, 0));
+        }
+        if( channel & Yrotation )
+        {
+            joint->matrix = glm::rotate(joint->matrix, value, glm::vec3(0, 1, 0));
+        }
+        if( channel & Zrotation )
+        {
+            joint->matrix = glm::rotate(joint->matrix, value, glm::vec3(0, 0, 1));
+        }
+    }
+
+    // then we apply parent's local transfomation matrix to this joint's LTM (local tr. mtx. :)
+    if( joint->parent != NULL )
+        joint->matrix = joint->parent->matrix * joint->matrix;
+
+    // when we have calculated parent's matrix do the same to all children
+    for(auto& child : joint->children)
+        moveJoint(child, motionData, frame_starts_index);
+}
+
+void Bvh::moveTo(unsigned frame)
+{
+    // we calculate motion data's array start index for a frame
+    unsigned start_index = frame * motionData.num_motion_channels;
+
+    // recursively transform skeleton
+    moveJoint(rootJoint, &motionData, start_index);
+}
+ What we do (for each joint, starting from root) is take the value from the motion data and apply it in the order it was loaded / defined in the file with both the glm::translate() and glm::rotate() functions. We use static helper function moveJoint() to help us with transforming joints using recursion. What we yet need to do is display it. Using the class and displaying a skeleton Constructing vertices array from skeleton's joint data is not BVH class' job. We'll do that where we need it. Using recursion and std::vector() we can easily construct the vertices array: 
+std::vector<glm::vec4> vertices;
+std::vector<GLshort>   indices;
+
+GLuint bvhVAO;
+GLuint bvhVBO;
+Bvh* bvh = NULL;
+
+/** put translated joint vertices into array */
+void bvh_to_vertices(JOINT*                  joint,
+                     std::vector<glm::vec4>& vertices,
+                     std::vector<GLshort>&   indices,
+                     GLshort                 parentIndex = 0)
+{
+    // vertex from current joint is in 4-th ROW (column-major ordering)
+    glm::vec4 translatedVertex = joint->matrix[3];
+
+    // pushing current 
+    vertices.push_back(translatedVertex);
+
+    // avoid putting root twice
+    GLshort myindex = vertices.size() - 1;
+    if( parentIndex != myindex )
+    {
+        indices.push_back(parentIndex);
+        indices.push_back(myindex);
+    }
+
+    // foreach child same thing
+    for(auto& child : joint->children)
+        tmpProcess(child, vertices, indices, myindex);
+}
+
+void bvh_load_upload(int frame = 1)
+{    
+    // using Bvh class
+    if( bvh == NULL )
+    {
+        bvh = new Bvh;
+        bvh->load("file.bvh");
+    }
+    
+    bvh->moveTo(frame);
+    
+    JOINT* rootJoint = (JOINT*) bvh->getRootJoint();
+    bvh_to_vertices(rootJoint, vertices, indices);
+    
+    // here goes OpenGL stuff with gen/bind buffer and sending data
+    // basically you want to use GL_DYNAMIC_DRAW so you can update same VBO
+}
+ Note there are some C++11 features. If you use GCC you should add few C++11 switches like -std=c++11 and -std=gnu++11 to make it compile. The bvh_tovertices() function helps us to reconstruct vertices using skeleton info. Outro So we've looked at the BVH format and how to load and display it. This is just a basic loader, which can be the stepping stone for some more advanced things like animation blending and mixing. That's it. Hope you like it. License GDOL (Gamedev.net Open License) Comments Karsten_ Jul 23 2013 05:27 AM I thought your article was really useful. I like the way that it demonstrates a core technology and gets into the nitty gritty details of implementing the loader yourself rather than just delegating the task out to a library or a commercial product. Keep up the good work yakuuzoo Jul 30 2013 09:40 PM THis is very helpful. Any way to get the source code to the article? Just to make sure we are working with working examples   thanks Edin M. Jan 27 2015 02:47 PM Took me a while It was bunch of messy unorganized mess, but I got myself together cleaned it up and published it on github. (Link at the top) Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: BVH File Loading and Displaying English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

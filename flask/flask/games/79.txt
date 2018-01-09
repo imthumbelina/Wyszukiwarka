@@ -1,0 +1,460 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Game Programming » Article: Enginuity, Part V Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Loading a Wave File Using Modern C++ to Eliminate Memory Problems Loading 3DS Files Enginuity, Part IV Banshee Engine Architecture - RTTI & Serialization Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 1 Like 2Likes Dislike Enginuity, Part V By Richard "superpig" Fine | Published Oct 28 2003 07:44 AM in Game Programming #39 unsigned void buffer interpolator it' value class float Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource Serialization, Triggers/Interpolators, and the Build Stamp or, I Can't Think Of A Witty Subtitle For This One I'm back, after a bit of a break to build up the codebase and the example game a bit. And to catch up on Real Life . ;-) Many thanks to all the people who've written in recently, urging me to continue with the series; I assured you all that I was not stopping, and this should be proof of that. From the list of topics I've got to cover, I estimate that our first demo game - CY - should arrive around article 8. So I've still got more to go, and I plan to continue after that, so... This article I'm going to show off a few tricks I came up with for Enginuity which aren't really something that every engine *needs* - they come under the heading of 'nifty features,' but you can get along without them. However, nifty as they are, I thought I'd show them to you. Four things: Serialization, the Triggers and Interpolators systems, and the build stamp. Serialization You'll like this one, you really will. I know that when I thought of it up in Edinborough, I was still grinning about it when the train reached Birmingham. (Doesn't being easily amused just *rock* on long journeys? :-) ) 'Serialization' is the general term for the processes of 'flattening' your data, for byte-stream uses such as storage in a file or transmission over a network, and then 'inflating' it again at the other end. Typical situations are messages for networked games, saved games, loading levels... hell, any custom resource that is loaded from or saved to a file needs a serialization mechanism (and the 'standard' resources, like bitmaps and sounds, need them too, but as far as Enginuity is concerned the libraries we use provide their own mechanisms). There are a large number of problems. Firstly, what data do you need to save out or load in? Your entire heap? The positions and velocities of every single object and entity, down to individual particles in the particle systems, for everything that is loaded into memory? Probably not. Then, there's the problem of actually structuring that data - after all, saving pointers straight to file is no good when you load them back in again, so you can't just do a dump of your objects. You need to determine a 'flat' structure for them - something I call a 'serialization structure.' Dators are a bit slow, and only really need to be used when a variable is going to be set by name. If you've ever worked with Quake BSP files, you'll have come across these 'serialization structures.' When a BSP file is actually in memory there's quite a bit more information than when on disk - a fair number of pointers between objects, for example - and that information is constructed when the level is loaded. The serialization structures - which, in Quake's case, are quite literally C structures - dictate how each piece of information in the BSP file is laid out - how a block of 32 bytes is divided into 4 longs, 6 ints, and 4 chars. So, while the first major problem - what to serialize - will depend on the situation, the second problem - how to do it - is something we can address with a strong framework. See, creating an entire C structure for each piece of information you want to serialize is not just messy, it's also inflexible - it's fixed at compile-time. I'm going to present to you a mechanism that uses function calls, rather than C structures, to establish serialization structures. That way you can easily control which functions get called through something as basic as if() blocks. There's also one of the original design requirements to be taken into account - the requirement that the engine be cross-platform. Well, while it's possible to write tools to load data files, swap the bytes around, and save them out again for different architectures, it's also a pain - and something which, in a time-critical situation, can really bite. It stinks of 'primary platform, plus ports' rather than 'cross-platform development;' it also requires the development of tools for each individual project, because a generalised program wouldn't know about the actual structure of the data and thus wouldn't know which bytes need swapping. The technique we look at today is completely architecture-independent; it actually uses SDL_Net's buffer read/write macros to serialize all data into network byte order (big-endian). If you don't like depending on SDL_Net to do that, it's very simple to replace the macros with your own equivalents. Firstly, let's look at a typical scenario. Say we have a ball object, CBall, and we want serialization functions on it. All it needs, to begin with, is position information. CBall::Flatten(ostream &out)
+{
+ out << position.x;
+ out << position.y;
+}
+
+CBall::Inflate(istream &in)
+{
+ in >> position.x;
+ in >> position.y;
+}Now, that works pretty well in simple situations, but it's potentially very problematic. Firstly, it's inflexible in that it depends on having STL streams to serialise to/from - that may well not be the case. Secondly, it's either going to be using a text-based format for storing the data - which is inefficient - or a binary format which will not necessarily be cross-platform. Thirdly, there's no real scope for error in there - things like buffer overflow aren't really tracked. Lastly, the existence of two seperate serialization functions means that you have to keep them both synchronized - some may argue that it's just one of the habits of a good programmer, like pairing calls to 'new' with calls to 'delete,' but I still maintain that everyone makes mistakes, and the smaller the chances of them happening, the better. It's 'hard-coded.' I don't just mean that if you change it you need to recompile - soft code often needs that too - but changing it requires changes in more than one place, and, depending on the change, could potentially require changes in many places - adding support for a new type of source or target, for example. The solution we're going to look at is more 'soft-coded' - the serialization structure is defined in one place and one place only, the system is pretty extensible, and - best of all - you can accurately calculate other things about the serialization structure, like how much space it *actually* needs (rather than just hoping that a sizeof() is big enough). What we have is simple - our objects support a 'serialize' method, which takes a single pointer to a 'target' object as its parameter. That 'serialize' function is all an object needs to provide to work with the system. That may sound a little familiar to those of you who have some MFC experience, but even MFC requires that you define the structure twice - once for loading, once for saving. The serialize function calls methods on the 'target' object, and those calls define the structure: the target object's methods are things like IOChar, IOFloat, IOLong, IOString, and so on. See where I'm going with this yet? With each of those calls, a reference to the variable in question is passed. So, IOChar(char &value), IOFloat(float &value), etc. Then - and here comes the cruncher - we derive different objects from the base 'target' interface - CSerialFlattener, CSerialInflator, CSerialSizer, and so on. They can then write the values to a buffer, read the values in from a buffer, or simply add to a running total of bytes written. The object itself never touches the actual read/write buffer - assuming there is one - and any change to the structure is felt across all operations on the structure. You could write 'serializer objects' to do pretty much anything - count the number of different types of variable used, generate code for a C-structure based on the serialization structure, whatever. The first three have suited me just fine so far. By forcing buffer read/writes to happen through a sort of 'visitor' object, we can do things like ensure that strings are always written out in a consistant way (I opt for size followed by unterminated string, but you could just as easily make all strings null-terminated), or check for buffer overflow/underflow (because underflow can be just as bad a sign as overflow). In fact, we can even take advantage of another nice feature of C++ - overloading. Instead of seperate IOChar/IOFloat type names for things, we just have a single IO() function overloaded for different types. Though, don't go too far - this might seem like one of the places where templates would work well, but remember that each type will probably need to be handled differently, making templates useless (because they're for applying the *same* operations to different types). Using overloading, though, is much nicer; it means that we don't have to check that the type of the variable matches the function, because the compiler will pick the correct function for us. The end result is a system which is a little bit like C++ iostreams, but does away with the concept of 'input' or 'output.' Let's pull out some code. Firstly, our base ISerializer interface: class ISerializer
+{
+public:
+ virtual void IO(unsigned char &value)=0;
+ virtual void IO(unsigned long &value)=0;
+ virtual void IO(std::string &str)=0;
+};If that looks a bit short, it's just because I've not needed any more types than unsigned char, unsigned long, and std::string just yet. It's pretty easy to add new types, as you'll understand soon. Let's start looking at the Serializers themselves with the simplest one, the CSerialSizer: class CSerialSizer : public ISerializer
+{
+protected:
+ unsigned long length;
+public:
+ CSerialSizer() { length=0; }
+
+ void IO(unsigned char &value)
+ { ++length; }
+
+ void IO(unsigned long &value)
+ { length+=4; }
+
+ void IO(std::string &str)
+ { IO(length); length+=str.length(); }
+
+ unsigned long getLength() { return length; }
+};Pretty simple. A char adds 1 byte to the size; an unsigned long adds 4 bytes. Why do I use literals instead of sizeof() expressions? Because - while in this case, the sizes of char and unsigned long are pretty much guaranteed - we want to be writing out the size of the data when serialized, rather than the size of the data when in memory. If I were to add an 'unsigned int' overload, would the size of it be 16 bits or 32 bits? Because we're trying to keep this cross-platform, we can't really guarantee either; and given that we're trying to keep the data *itself* cross-platform too, we have to pick one and stick with it (I'd probably opt for 32 bits). Thus, the size of an 'unsigned int' when serialized - 4 bytes - might not correspond to the size of an 'unsigned int' when in memory - 2 bytes. For consistency I decided to write things the same way for the non-ambiguous types too; you're perfectly free to use sizeof() if you want, just bear in mind that sizeof() isn't always the right answer. Incidentally, the 'length' variable is protected, rather than private, for a simple reason: you will quite probably introduce your own basic data structures in projects, which should be kept specific to that project. So, to minimize polluting the Enginuity codebase itself with overloads for your custom data types, you only need to overload in once place - ISerializer - and then you can derive your own CExtendedSerialSizer (or whatever) which implements those new overloads; the Enginuity serializer classes themselves will (aside from ISerializer itself) be unchanged. (If you wanted to be *really* neat and avoid polluting the Enginuity codebase all together, you could create another interface class - IExtendedSerializer - which has ISerializer as a virtual public base class. Then, you derive your CExtendedSerialSomething from both CSerialSomething *and* IExtendedSerializer; the end result should be an extended class which has overloads from both base classes in it, and you can still use IExtendedSerializer as an interface to all your extended serializer objects). When you use CSerialSizer (or your own extension of it), it'll probably be to allocate a buffer for use with a CSerialSaver. class CSerialSaver : public ISerializer
+{
+protected:
+  unsigned char *buffer;
+  bool bHasOverflowed;
+  unsigned long length;
+  unsigned long bytesUsed;
+public:
+  CSerialSaver(unsigned char *buf, unsigned long size)
+  {
+    buffer=buf; length=size; bytesUsed=0; bHasOverflowed=false;
+  }
+
+  void IO(unsigned char &value)
+  {
+    if(bHasOverflowed)return; //stop writing when overflowed
+    if(bytesUsed+1>length){bHasOverflowed=true; return; }
+    *buffer=value;
+    ++buffer; ++bytesUsed;
+  }
+  void IO(unsigned long &value)
+  {
+    if(bHasOverflowed)return; //stop writing when overflowed
+    if(bytesUsed+4>length){bHasOverflowed=true; return; }
+    SDLNet_Write32(value,buffer);
+    buffer+=4; bytesUsed+=4;
+  }
+  void IO(std::string &str)
+  {
+    unsigned long l=str.length();
+    IO(l);
+    if(bHasOverflowed)return;
+    if(bytesUsed+l>length){bHasOverflowed=true; return; }
+    memcpy(buffer,str.c_str(),l);
+    buffer+=l; bytesUsed+=l;
+  }
+
+  bool hasOverflowed() { return bHasOverflowed; }
+
+  //should be equal to 0 when we're done
+  long getFlow() { return length-bytesUsed; }
+};There. The constructor takes a pointer to the buffer you want it to fill, along with the size of that buffer (so it can track when it's overflowing). Then, we have three overloads. The first two are very similar: they check that the overflow flag hasn't been set (and if it has, they bail out). Then, they check that the write wouldn't *cause* the buffer to overflow (and it if would, flag the overflow and bail out). Then they perform the write itself; the unsigned char overload simply copies through the byte, while the unsigned long overload uses an SDL_Net macro to make sure the value is written out in network byte order (it's a simple macro, so if you don't like depending on SDL_Net, it's easy to replace). Then, each increments the buffer pointer (the current write position) and the number of bytes used up. The last overload - std::string - is pretty similar, but it actually calls one of the other overloads to write out the size of the string before the string itself. You can create such 'composite serial members' in this way; an overload for a vector class, for example, would probably just be implemented using three calls to IO(float). (If you're using my IExtendedSerializer suggestion, that's one of the beautiful bits - you can actually implement the overload in the base IExtendedSerializer class, and when you later derive from it with CSerialSaver/CSerialLoader the IO calls from the overload will be mapped to the correct virtual functions. That is, your extended overload calls IO(long), which successfully goes through to the CSerialSomething that you extended). The last two functions, hasOverflowed() and getFlow(), are for error detection. The first of the two is pretty simple - it tells you whether the overflow flag has been set (there was an attempt to write more data than the buffer could hold). The second is for detecting underflow; this isn't such a serious error as overflow, but it still might be indicative of something not having worked correctly - especially if you're using a buffer with the size given by a CSerialSizer and the object you're serialising hasn't changed. The serialisation structure should be exactly the same in both cases, so if it hasn't filled the buffer perfectly, something's screwy. If you don't use a CSerialSizer, and just pass a buffer that you think is large enough, then you can use the flow to work out how much of the buffer was actually used (to save you writing out the extra padding at the end). Now, the CSerialLoader: class CSerialLoader : public ISerializer
+{
+protected:
+  unsigned char *buffer;
+  bool bHasOverflowed;
+  unsigned long length;
+  unsigned long bytesUsed;
+public:
+
+  CSerialLoader(unsigned char *buf, unsigned long size)
+  {
+    buffer=buf; length=size; bytesUsed=0; bHasOverflowed=false;
+  }
+
+  void IO(unsigned char &value)
+  {
+    if(bHasOverflowed)return; //stop writing when overflowed
+    if(bytesUsed+1>length){bHasOverflowed=true; return; }
+    value=*buffer;
+    ++buffer; ++bytesUsed;
+  }
+  void IO(unsigned long &value)
+  {
+    if(bHasOverflowed)return; //stop writing when overflowed
+    if(bytesUsed+4>length){bHasOverflowed=true; return; }
+    value=SDLNet_Read32(buffer);
+    buffer+=4; bytesUsed+=4;
+  }
+  void IO(std::string &str)
+  {
+    unsigned long l;
+    IO(l);
+    if(bHasOverflowed)return;
+    if(bytesUsed+l>length){bHasOverflowed=true; return; }
+    char *szBuf=new char[l+1];
+    szBuf[l]=0;
+    memcpy(szBuf,buffer,l);
+    str=szBuf;
+    delete[] szBuf;
+    buffer+=l; bytesUsed+=l;
+  }
+
+  bool hasOverflowed() { return bHasOverflowed; }
+
+  //should be equal to 0 when we're done
+  long getFlow() { return length-bytesUsed; }
+
+};Pretty damn similar to the CSerialSaver, I think you'll agree. The constructor is exactly the same; the first two IO overloads simply flip the assignments over, so that the buffer is now copied to the value rather than the other way around. The third overload looks a little more complex, but it's actually still pretty simple - it reads back in the size as an unsigned long, and then allocates a temporary buffer to hold the string; reads the string, converts it to a std::string, and delete the temporary buffer. Once again, at the end, we have hasOverflowed() and getFlow(), doing exactly the same thing as before. Underflow is more of a problem here, as it means the whole buffer wasn't read in - if you thought you'd handed it a complete resource, evidently the serialization structure of the data is different to that of the object, so the data is either corrupt or you're trying to feed it into the wrong object. Let's take a look at a sample serialization function on an object, then. This is taken from the high-scores table code in the upcoming demo game, CY. Here are the relevant parts of the class definition: class CHighScoresTable : public Singleton<CHighScoresTable>  
+{
+public:
+  CHighScoresTable();
+  virtual ~CHighScoresTable();
+
+  void Serialize(ISerializer *s);
+
+  bool Load();
+  bool Save();
+
+  struct hs 
+  { 
+    std::string name; 
+    unsigned long score; 
+  }scores[10];
+
+  inline int getScoreCount() const { return 10; }
+};While there are separate Load/Save functions in this object, they don't actually touch the serialization structure - all they do is create the Serializer objects and work with the highscor.dat file, as you'll see. The constructor initializes all the values in the table to the default highscores. If the highscor.dat file can't be opened, the scores will reset to defaults, and then get written out in a new file. So, to reset the high scores you can just delete the highscores file. CHighScoresTable::CHighScoresTable()
+{
+  for(int i=0;i<10;i++)
+  {
+    scores[i].name="Nobody";
+    scores[i].score=100-i*10;
+  }
+}Here's the serialization function itself. For each entry in the table, it just gives the name (a std::string) and score (an unsigned long). void CHighScoresTable::Serialize(ISerializer *s)
+{
+  for(int i=0;i<10;i++)
+  {
+    s->IO(scores[i].name);
+    s->IO(scores[i].score);
+  }
+}This is how loading the table is actually done. The function has no relation to the serialization structure; changes to the Serialize() function will not affect it. All it does is open the file, read in the contents, and hand it to the Serialize function (in a CSerialLoader) to be actually loaded. bool CHighScoresTable::Load()
+{
+  unsigned long size=0;
+
+  FILE *fp=fopen("highscor.dat","rb");
+  if(!fp)return false;
+
+  fseek(fp,0,SEEK_END);
+  size=ftell(fp);
+  fseek(fp,0,SEEK_SET);
+
+  unsigned char *buffer=new unsigned char[size];
+  fread(buffer,1,size,fp);
+  fclose(fp);
+
+  CSerialLoader sl(buffer, size);
+  Serialize(&sl);
+  assert(sl.getFlow()==0);
+
+  delete[] buffer;
+
+  return true;
+}And here's the complimetary save function. Again, it opens the file; it uses both a CSerialSizer *and* a CSerialSaver to get the size of the data to write out, though in fact this could be made more efficient by writing a CFileSaver which writes directly to the file rather than to a buffer. The same goes for the Load function. bool CHighScoresTable::Save()
+{
+  FILE *fp=fopen("highscor.dat", "wb");
+  if(!fp)return false;
+
+  CSerialSizer ss;
+  Serialize(&ss);
+  unsigned long size=ss.getLength();
+
+  unsigned char *buffer=new unsigned char[size];
+  CSerialSaver sv(buffer,size);
+  Serialize(&sv);
+  assert(sv.getFlow()==0);
+
+  fwrite(buffer,size,1,fp);
+  fclose(fp);
+  delete[] buffer;
+
+  return true;
+}I think you'll agree that's pretty simple, especially when you're dealing with a large number of different objects - if you've got, say, a set of 100 objects of varying classes, all implementing some kind of ISerializable interface, then you can have a single save/load function pair to loop through all of them and call Serialize() functions on them. Now, the method isn't without its caveats. For one, it requires that you plan your serialization structures with a bit more care; for example, if the number of entries in a serialization structure is going to be variable, you *have* to record that number at the beginning, rather than simply reading/writing till all the bytestream is used up. Such structures, though, are what I'd call 'deterministic;' you always have the information to read/write without needing any knowledge at all of the underlying byte-stream. After all, if you had serializers which sent data to and from sockets directly, you wouldn't necessarily *have* an end-of-file to test against. Triggers/Interpolators It's time to look at a couple more 'utility' objects - 'utility' in that they're internal engine objects that you don't really use on their own. However, that doesn't stop me from having found them to be some of the most useful objects in the engine. They're fairly similar in design and operation - they just behave a little differently - which is why I'm presenting them together. Interpolators Interpolators are particularly useful objects when it comes to polish and effects. Quite simply, Interpolators take an input value - most often the clock - and use it to interpolate an output value. The output is set by reference, so the interpolator can directly change it with no problems. Want a fade-out effect? Simply set up an interpolator with your global alpha value as the output. It's also very simple to set up different types of interpolation - plain linear interpolation may do for many things, but smoother methods - quadratic and cubic - will be shown here as well. class IInterpolator : public IMMObject
+{
+protected:
+  float &target;
+  static std::list< CMMPointer<IInterpolator> > interpolators;
+public:
+  IInterpolator(float &t);
+  virtual ~IInterpolator();
+
+  bool bFreeze;
+
+  virtual void Update(float dt)=0;
+  void Kill();
+
+  friend class CInterpolatorUpdater;
+  AUTO_SIZE;
+};We're going to assume that all interpolators work with float values (I can't think of many situations where they wouldn't be - though if you *really* needed to, you could set it up with templates). So, we have a float reference to our 'target' value - our output. We also have a list of CMMPointers to IInterpolators. This next one took me a while to get right. Interpolators are sort of self-referencing objects. When you create one, it will add itself to the 'interpolators' list using a CMMPointer - which means that even if you release all your pointers to the interpolator, it'll still be held in existence by that pointer in the list. Why is that useful? It means you can create an interpolator, and drop it out of scope, without it dying. It's going to need to be alive to function. When it comes down to it, you don't even need to keep a local copy of the interpolator - you can just do 'new CLinearInterpolator(...);' as a standalone statement, and this will handle the rest. Of course, if you do that you lose control of the interpolator - you can't pause it or kill it unless it pauses or kills itself. A possible extension to this system, then, would be a way to give an interpolator an ID - a string or unique number - which you give the interpolator when it is created, and can then be used to retrieve a pointer to the interpolator later on, so you can (for example) kill it. Now we get to the public functions. There's the constructor and destructor - the constructor taking the initial value for 'target.' bFreeze is a boolean flag which you can set to 'freeze' the interpolator - it will not be updated while it is frozen. Update() is the function derived classes must implement. It's that function which 'powers' the interpolator - does the calculation and assigns to the output value. It takes dT - 'delta time' - as a parameter, because 95% of our interpolators will be time-based so, unless you're going for micro-optimization and consider the time taken to pass the argument too much, there's no point having them all fetch the time themselves. If an interpolator doesn't need it, it ignores it. Kill() is a simple function to remove the interpolator from it's own list. If you call Kill() on an interpolator, and then drop all references to it, it really *will* be destroyed. Technically, you can call Kill() on it and still keep references to it, but it won't be updated any more (unless you call IInterpolator::Update() on it yourself each frame). Lastly, it marks CInterpolatorUpdater (we'll meet it in a minute) as a friend class, and then uses the expected AUTO_SIZE macro to fulfill abstract functions on IMMObject, from which it derives. Here's the (brief) implementation of the non-abstract functions: IInterpolator::IInterpolator(float &t) : target(t)
+{
+  interpolators.push_back(this);
+  bFreeze=false;
+}
+
+IInterpolator::~IInterpolator()
+{
+
+}
+
+void IInterpolator::Kill()
+{
+  std::list< CMMPointer<IInterpolator> >::iterator it=
+      (std::find(interpolators.begin(),interpolators.end(),this));
+  if(it!=interpolators.end())
+    (*it)=0;
+}The constructor sets up the target reference, and adds itself to the list of pointers. It also has the interpolator start in a non-frozen state by default. The destructor does nothing (it's only there to make sure derived destructors works properly). Lastly, Kill() finds the interpolator in the list and (assuming it can find it) sets its pointer to zero, releasing it. So... we've got all these interpolators knocking about with Update() functions on them, all in a list - sounds fairly easy to do. We'll use a task for it: class CInterpolatorUpdater : public ITask
+{
+public:
+  bool Start();
+  void Update();
+  void Stop();
+  AUTO_SIZE;
+};That's about as minimial a task as you can get. bool CInterpolatorUpdater::Start() { return true; }
+void CInterpolatorUpdater::Stop() { IInterpolator::interpolators.clear(); }
+void CInterpolatorUpdater::Update()
+{
+  PROFILE("Interpolator task");
+  std::list< CMMPointer<IInterpolator> >::iterator it,
+            ite=IInterpolator::interpolators.end(), itT;
+  for(it=IInterpolator::interpolators.begin(); it!=ite; it++)
+  {
+    if((*it).isValid())
+    {
+      (*it)->Update(CGlobalTimer::dT);
+    }else{
+      //remove invalid entries from the list, just to keep things fast
+      itT=it;
+      --it;
+      IInterpolator::interpolators.erase(itT);
+    }
+  }
+}Start() does nothing (it doesn't need to do anything). Stop() kills the list of pointers - thus releasing all interpolators when the task is shut down (otherwise they'd still be in scope when CollectRemaningObjects gets called, giving 'unreleased object' reports in the logs). Update() simply loops through the list of interpolators; for each interpolator, it tests that the pointer is actually valid, and if it is, calls Update() on it. If not, it removes that entry from the list - no point iterating over dead entries, and as more and more interpolators are created and destroyed, those dead entries would build up. So, that's our basic interpolator system. Let's see some objects we'll actually use! class ITimebasedInterpolator : public IInterpolator
+{
+protected:
+  float elapsedTime, totalTime;
+  virtual void Calculate()=0;
+public:
+  void Reset();
+  void Update(float dt);  
+  ITimebasedInterpolator(float &targ, float time);
+  AUTO_SIZE;
+};This is the base class for interpolators which interpolate from start to finish across a fixed time period. Note that there are plenty of interpolators that *use* time but are not considered time-based - a sine-wave interpolator would be an example, an interpolator which oscillates its target value at a given phase, amplitude and frequency for an indefinite period of time. This base class implements Update() - which updates the elapsed time and checks to see if the total time has been exceeded (in which case the interpolator expires, Kill()ing itself). There's also a Reset() function, which sets elapsedTime back to zero (to 'restart' the interpolator). However, it adds an abstract function of its own - Calculate - which the classes below implement to work out the output value in their own specific ways: class CLinearTimeInterpolator : public ITimebasedInterpolator
+{
+protected:
+  float startVal, endVal;
+  void Calculate();
+public:
+  CLinearTimeInterpolator(float &targ, float time, float sV, float eV);
+  AUTO_SIZE;
+};
+
+class CQuadraticTimeInterpolator : public ITimebasedInterpolator
+{
+protected:
+  float startVal, midVal, endVal;
+  void Calculate();
+public:
+  CQuadraticTimeInterpolator(float &targ, float time,
+                             float sV, float mV, float eV);
+  AUTO_SIZE;
+};
+
+class CCubicTimeInterpolator : public ITimebasedInterpolator
+{
+protected:
+  float startVal, midVal1, midVal2, endVal;
+  void Calculate();
+public:
+  CCubicTimeInterpolator(float &targ, float time, float sV,
+                         float mV1, float mV2, float eV);
+  AUTO_SIZE;
+};How do these interpolators work? To answer that, we're going to need to do a little math. Firstly, we can treat the time as a value between 0 and 1 - 0 means no time has elapsed, and 1 means all time (totalTime) has elapsed. Call that value 'b.' In a linear interpolator, we want a 'b' value of 0 to produce the start value, and a 'b' value of 1 to produce the end value. A 'b' value of 0.5 should produce a value half-way between the start and end. We could say that the start value is equal to 'startValue * 1 + endValue * 0' and that the end value is equal to 'startValue * 0 + endValue * 1.' In fact, for any value through the interpolator, it'll be 'startValue * someNumber + endValue * someOtherNumber.' someNumber and someOtherNumber will always add up to 1 - that is, 'one whole value.' They're blending weights. When 'b' is 0 someOtherNumber is 0, and when 'b' is 1 someOtherNumber is 1 - it doesn't take too much effort to suppose that someOtherNumber=b. Given that someOtherNumber + someNumber = 1, someNumber must = 1 - b. We'll call that 'a.' So, in a linear interpolator, the output is 'a * startVal + b * endVal.' And if you look at the code: void CLinearTimeInterpolator::Calculate()
+{
+  //calculate b, keeping it clamped to the range [0,1]
+  float b=clamp(elapsedTime/totalTime,0,1);
+  target = startVal*(1-b) + endVal*b;
+}Exactly what we said. How about the next interpolators, though? Are they quite as simple? Nearly. We've established that '(a+b)=1'. That means that '(a+b)^2=1' (because 1^2=1). If you multiply out (a+b)^2, you get 'a^2 + 2ab + b^2' - three values. If we add to our startValue and endValue a 'middleValue,' we can do 'a^2 * startValue + 2ab * middleValue + b^2 * endValue.' The placement of the middleValue with respect to the start and end values will affect the 'steepness' of things at each end - for a sudden fade-in and then gradual fade-out, you could use a quadratic interpolator with the middleValue near the startValue. Fun fact: quadratics were how Quake 3 did its curvy surfaces ('bezier patches'). void CQuadraticTimeInterpolator::Calculate()
+{
+  float b=clamp(elapsedTime/totalTime,0,1), a=1-b;
+  target = startVal*a*a + midVal*2*a*b + endVal*b*b;
+}The theory extends. If '(a+b)^2=1' produces an expression with 3 terms - 'coefficients' - then it's not a tremendous leap of the imagination to say that '(a+b)^3' would produce 4 terms. That's right - 'a^3 + 3ba^2 + 3ab^2 + b^3' - so we can plug four values into our interpolator. The expression (a+b)^3 is 'a plus b cubed,' thus this is a 'cubic' interpolator. It's possible to have an interpolator which accepts any number of values. Given 'n' values, you just expand '(a+b)^(n-1)' to get your coefficients. It follows a nice pattern - for term 'r' out of a total of 'n' terms, the coefficient is something like 'nCr * a^r * b^(n-r).' Google for the 'binomal theorem' if you want to know more; more terms mean more calculation time, though, and cubic interpolation is usually good enough for me. void CCubicTimeInterpolator::Calculate()
+{
+  float b=clamp(elapsedTime/totalTime,0,1), a=1-b;
+  target = startVal*a*a*a + midVal1*3*a*a*b + midVal2*3*a*b*b + endVal*b*b*b;
+}The only thing that remains: void ITimebasedInterpolator::Update(float dt)
+{
+  if(bFreeze)return;
+  elapsedTime+=dt;
+  Calculate();
+  if(elapsedTime>totalTime)
+  {
+    Kill();
+  }
+}Triggers Triggers, like interpolators, are small objects that you can chuck around pretty liberally. They have a task updating them in the same way as the interpolators, but rather than working with changing an output, instead they monitor an input. Again, the input is set by reference; the idea is that you set a trigger up with a variable to 'watch' and a functor to call when a certain condition is met, and then let it get on with things; "don't call us, we'll call you." class ITrigger : public IMMObject
+{
+public:
+  ITrigger(Functor *h, bool fo);
+  virtual ~ITrigger();
+
+  void Kill();
+protected:
+  CMMPointer<Functor> handler;
+  bool bFireOnce;
+
+  virtual bool Test()=0;
+
+  static std::list< CMMPointer<ITrigger> > triggerList;
+
+  friend class CTriggerTask;
+
+private:
+  void Tick();
+};You should spot some similarities to the IInterpolator base class; there's the friend declaration, and the list of memory-managed ITrigger pointers. There's also that Kill() function, to remove a trigger before it expires (or if, indeed, it's set not to expire). Notice that the base class doesn't have a reference to an input variable - that's because unlike the Interpolators, we're going to allow Triggers to work with any type (not just float). ITrigger::ITrigger(Functor *h, bool fo)
+{
+  handler=h;
+  bFireOnce=fo;
+  triggerList.push_back(this);
+}
+
+ITrigger::~ITrigger()
+{
+
+}
+
+void ITrigger::Kill()
+{
+  std::list<CMMPointer<ITrigger> >::iterator it=
+      std::find(triggerList.begin(), triggerList.end(), this);
+  if(it!=triggerList.end())
+    (*it)=0;
+}
+
+void ITrigger::Tick()
+{
+  if(Test())
+  {
+    (*handler)();
+    if(bFireOnce)
+    {
+      Kill();
+    }
+  }
+}Again, all fairly familiar stuff. The constructor handles the self-referencing list stuff again, and the Kill() function has just changed interpolatorList to triggerList. The Tick() function is the equivalent of the Update() function in the interpolators, and as such is called every frame. The Test() function performs the actual test - in most derived classes it'll be a one-line function, as you'll see. If it returns true - that is, the test condition is satisfied - then the handler is called, and the trigger is destroyed (if it's been set to only fire once). class CTriggerTask : public ITask
+{
+public:
+  bool Start();
+  void Update();
+  void Stop();
+  AUTO_SIZE;
+};
+
+bool CTriggerTask::Start() { return true; }
+void CTriggerTask::Stop() { ITrigger::triggerList.clear(); }
+void CTriggerTask::Update()
+{
+  PROFILE("Trigger task");
+  std::list< CMMPointer<ITrigger> >::iterator it,
+        ite=ITrigger::triggerList.end(), itT;
+  for(it=ITrigger::triggerList.begin(); it!=ite; it++)
+  {
+    if((*it).isValid())
+    {
+      (*it)->Tick();
+    }else{
+      itT=it;
+      --it;
+      ITrigger::triggerList.erase(itT);
+    }
+  }
+}Identically minimalistic. (This one actually *was* a copy-and-paste job). Now, onto some derived classes. I use the names 'subject' and 'object' for the input and the thing it's tested against ('subject-predicate-object', where predicate is the test itself): template<class T>
+class CEqualsTrigger : public ITrigger
+{
+protected:
+  T &subject;
+  T object;
+public:
+  CEqualsTrigger(T& s, T o, Functor *h, bool fo=true)
+    : ITrigger(h,fo), subject(s)
+  {
+    object=o;
+  }
+
+  bool Test(){return (subject==object);}
+
+  AUTO_SIZE;
+};You can now see why most of the Test() functions will be one-line jobs. Any type you want to use with the triggers system is going to need operators for whatever test you want to perform, of course - you won't be able to create a CEqualsTrigger<SomeClass> if SomeClass doesn't provide an == operator (you'll get a compiler error). You'll also need assignment operators - for the 'object' parameter, at the very least. template<class T>
+class CNotEqualsTrigger : public ITrigger
+{
+protected:
+  T &subject;
+  T object;
+public:
+  CNotEqualsTrigger(T& s, T o, Functor *h, bool fo=true)
+    : ITrigger(h,fo), subject(s)
+  {
+    object=o;
+  }
+
+  bool Test(){return !(subject==object);}
+
+  AUTO_SIZE;
+};
+
+template<class T>
+class CLessTrigger : public ITrigger
+{
+protected:
+  T &subject;
+  T object;
+public:
+  CLessTrigger(T& s, T o, Functor *h, bool fo=true)
+    : ITrigger(h,fo), subject(s)
+  {
+    object=o;
+  }
+
+  bool Test(){return (subject<object);}
+
+  AUTO_SIZE;
+};
+
+template<class T>
+class CGreaterTrigger : public ITrigger
+{
+protected:
+  T &subject;
+  T object;
+public:
+  CGreaterTrigger(T& s, T o, Functor *h, bool fo=true)
+    : ITrigger(h,fo), subject(s)
+  {
+    object=o;
+  }
+
+  bool Test(){return (subject>object);}
+
+  AUTO_SIZE;
+};You get the idea. It becomes drastically easy to write trigger classes - so easy, in fact, that I provided you a macro for doing it (commented out, in triggers.h). TRIGGER_CLASS(classname, test) will define a trigger class - there are a couple of examples there for you. Of course, for those of you who consider macros to be the devil, I invite you to exorcise it from the file, liberally redecorate with holy water, and write the classes out in full. Your choice. There are also a bunch of 'key' triggers, designed to work with the input system, which call functors when keys are pressed/released (making key binding incredibly simple). The Buildstamp This isn't so much part of the engine as it is a simple project trick that could be more suited to a Sweet Snippet or something like it, but I'm going to put it in anyway because (a) Enginuity uses it, and (b) it's nifty. When you're working with a project over a fairly long period of time, having gone through several builds, with various betas and test releases having been distributed amongst team members and the odd friend looking to test their particular hardware configuration.. it can be difficult to keep track of them all, to find out which 'version' of an in-development project you're dealing with. It becomes particularly important when it comes to networked games - you need to ensure that all your clients have the same build of the game, otherwise messages could get interpreted differently across platforms, protocols could mismatch.. you'd generally get what appear to be a load of bugs which are actually just due to not having updated the build properly. So, the most obvious way to do this is to track the date and time of the build. You *could* just request that everyone right-click their executables and check that the creation date is the same across all machines, but that's hardly efficient - quite aside from the fact that you're relying on the local file having the same creation date as the build, and with things like version-control systems knocking around there's no guaranteeing that'll be the case. No, the best option is to compile the date and time into the executable itself; you get the added advantage, there, of being able to access it in code. So, when your networked games connect to each other, they can compare 'buildstamps' - if they're not the same, the connection is not made; the two times could even be tested to see which is older, and the developer in question given a message telling them to update their build. A global variable does the trick. const std::string buildStamp = "ProjectName " __TIMESTAMP__;__TIMESTAMP__ is, according to MSDN, a universally defined ANSI C macro, so it should be safe to use. If you can't get it to work, you may need to resort to the more advanced method I describe in a minute. I've got my projects set up with that line in a file all on its own - 'buildstamp.cpp.' An 'extern const std::string buildStamp' in engine.h makes the buildstamp value available throughout the engine. The only problem we've not mentioned is, ironically, with the efficiency of the compiler. Buildstamp.cpp will get built once, but then with no changes it won't get built again - irritatingly, the compiler doesn't pick up that because the value of __TIMESTAMP__ has changed, the resulting object code would be different, but oh well. Add a custom build step in MSVC, or a custom makefile rule, to delete the buildstamp.obj file after the executable is built. That will force the compiler to regenerate the buildstamp.cpp file whenever you want to link and produce a new executable. For the more elite amongst you, you may want to use a more advanced technique - it's not something I really thought I needed, but it gives you increased flexibility and could potentially be useful in a situation where multiple developers are working on a project. Basically, rather than writing the buildstamp.cpp file yourself, you write a short program to generate it - with the obvious advantage that such a program would have access to any information you care to give it access to, including the name of the user currently logged onto the computer ('built by "fine.richard" at...'), or even a file to keep track of the number of times the generator program has been run (a build number). As before, you hook this program in as a custom build step, and voila - each build will have a freshly-generated buildstamp.cpp file, containing any information you want. I'd recommend that you write such a program to use a config file specific to the project - you can store the project name and current build number in there, while reusing the generator program across projects. Conclusion We've covered a chunk more today; hopefully that'll keep you all going for a bit while I finish up with article 6. :-) The interpolator and triggers come in particularly handy for polished GUI sequences I've found - menus sliding smoothly in and out - and the buildstamp, while not essential just yet, will come in very handy when we write the networking system. Incidentally, I just ported the demo game - 'CY' - across to Mac OS X. The total time taken was about 4.5 hours, and most of that was spent accounting for differences between the compilers (like the fact that GCC has better adherence to standards than MSVC6, and thus didn't let me get away with much of my sloppy coding). There were only about 3 actual bugs that were exposed by the port, and one of them was simply that I'd not implemented user-level logging on Mac at that time (I have now, thanks to John McDowall - major kudos, man). Four and a half hours. Not bad, hmm? :-) The OSX port is an entrant into the uDevGame competition over at www.idevgames.com - Mac owners, go and help them out by playing the games and voting for your favourites! Judging by some of the entries last year - like the spectacular 'Kiki the Nanobot' - you won't be disappointed with the originality and sheer style of some of the entries. I'm off for lunch. If you've got questions or comments, the discussion thread is a good place to start, otherwise I can be reached at rfine AT tbrf no-spam-monkeys DOT net. Next time, I think we'll be looking at the texturing system, but until then: have fun! Download attached article resource Comments em3plum Nov 06 2014 02:09 AM this series is very useful are you ever going to do a 3d renderer and a physics engine for it Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Game Programming » Article: Enginuity, Part V English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

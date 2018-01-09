@@ -1,0 +1,410 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Graphics Programming and Theory » Article: Introduction to Shader Programming Part IV: Programming Pixel Shaders Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Advanced Shader Programming: Diffuse & Specular Lighting with Pixel Shaders Introduction to Shader Programming Part III Fundamentals of Pixel Shaders Real-Time Cartoon Rendering with Direct-X 8.0 Hardware Shader Programming Part I: Fundamentals of Vertex Shaders Texture Splatting in Direct3D Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Introduction to Shader Programming Part IV: Programming Pixel Shaders By Wolfgang F. Engel | Published Jun 11 2002 05:31 PM in Graphics Programming and Theory texture pixel shader map normal instructions instruction color set Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource (Last modification: June 8th, 2002) This chapter covers the basics of pixel shader programming. You are going to learn in the following pages how to code a pixel shader-driven application by using the same lighting reflection models as in the second part of this introduction. There is one big difference: this time we will calculate light reflection on a per-pixel basis, which leads to a bumpy impression of the surface. Most of the effects that modify the appearance of a surface in a lot of games are calculated today on a per-vertex basis. This means that the lighting/shading calculations are done for each vertex of a triangle, as opposed to each pixel that gets rendered or per-pixel. In some cases per-vertex lighting produces noticeable artifacts. Think of a large triangle with a light source close to the surface. As long as the light is close to one of the vertices of the triangle, you can see the diffuse and specular reflection on the triangle. When the light moves towards the center of the triangle, the rendering gradually loses these lighting effects. In the worst case, the light is directly in the middle of the triangle and there is nearly no effect visible on the triangle, where there should be a triangle with a bright spot in the middle. That means that a smooth-looking object needs a lot of vertices or a high level of tesselation, otherwise the coarseness of the underlying geometry is visible. That's the reason why the examples in part 2 of this introduction used a highly tesselated Bézier patch class, to make the lighting effect look smooth. Our first example shows a directional light source with a diffuse reflection model. RacorX6 Figure 1 - Per-Pixel Diffuse Reflection Like all the previous and all the upcoming examples, this example is based on the Common Files framework provided with the DirectX 8.1 SDK (Read more in part 2 of this introduction). Therefore <Alt>+<Enter> switches between the windowed and full-screen mode, <F2> gives you a selection of the usable drivers and <Esc> will shutdown the application. Additionally the <B> key toggles diffuse lighting, the <W> and <S> keys allows to zoom in and out, the left mouse button rotates the globe, the right mouse button moves the directional light and the <P> key toggles between ps.1.1 and ps.1.4, if available. The following examples won't run on graphics hardware that doesn't support pixel shaders. On hardware that does not support ps.1.4 a message "ps.1.4 Not Supported" is displayed. As in the previous parts of this introduction, we will track the life cycle of the pixel shader in the following pages. Check for Pixel Shader Support To be able to fallback on a different pixel shader version or the multitexturing unit, the pixel shader support of the graphics hardware is checked with the following piece of code in ConfirmDevice(): if( pCaps->PixelShaderVersion < D3DPS_VERSION(1,4) )
+  m_bPS14Available = FALSE;
+if( pCaps->PixelShaderVersion < D3DPS_VERSION(1,1) )
+  return E_FAIL; The value in the D3DCAPS structure, which is filled by GetDeviceCaps(), corresponds to the ps.x.x instruction at the beginning of the pixel shader source. Therefore the macro D3DPS_VERSION(1,4) checks for support of ps.1.4. If ps.1.4 is not available, the BOOL variable m_bPS14Available is set to false and the user is prevented from switching between the pixel shader versions. Set Texture Operation Flags (with D3DTSS_* flags) The pixel shader functionality replaces the D3DTSS_COLOROP and D3DTSS_ALPHAOP operations and their associated arguments and modifiers, but the texture addressing, bump environment, texture filtering, texture border color, mip map, texture transform flags (exception ps.1.4: D3DTFF_PROJECTED) are still valid. The texture coordinate index is still valid together with the fixed-function T&L pipeline (Read more in part 3 of this introduction). Using the D3DTEXF_LINEAR flag for the D3DTSS_MINFILTER and D3DTSS_MAGFILTER texture stage states indicates the usage of bilinear filtering of textures (Direct3D terminology: linear filtering). This is done in RestoreDeviceObjects() for the color map: m_pd3dDevice->SetTextureStageState( 0, D3DTSS_MINFILTER, D3DTEXF_LINEAR); m_pd3dDevice->SetTextureStageState( 0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR); Switching on mip map filtering or trinlinear filtering for the color and the normal map with the following statement could be a good idea in production code: m_pd3dDevice->SetTextureStageState( 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);Set Texture (with SetTexture()) With proper pixel shader support and the texture stage states set, the textures are set with the following calls in Render(): // diffuse lighting
+if(m_bBump)
+{
+  m_pd3dDevice->SetTexture(0,m_pColorTexture);
+  m_pd3dDevice->SetTexture(1,m_pNormalMap);
+
+  m_pd3dDevice->SetPixelShader(m_dwPixShaderDot3);
+}
+else
+{
+  //no lighting, just base color texture
+  m_pd3dDevice->SetTexture(0,m_pColorTexture);
+  m_pd3dDevice->SetPixelShader(m_dwPixShader);
+} In case the user switched the diffuse lighting off, only the color texture is set. Otherwise the color texture and the normal or bump map texture are set. Define Constants (with SetPixelShaderConstant()/def) We set four constant values into c33 in RestoreDeviceObjects(). These constants are used to bias the values that should be send via the vertex shader color output register to v0 of the pixel shader: // constant values
+D3DXVECTOR4 half(0.5f,0.5f,0.5f,0.5f);
+m_pd3dDevice->SetVertexShaderConstant(33, &half, 1); In FrameMove() the light direction, the concatenated world-, view- and projection matrix and the world matrix is set into c12, c8 and c0: // light direction
+D3DXVec4Normalize(&m_LightDir,&m_LightDir);
+m_pd3dDevice->SetVertexShaderConstant(12, &m_LightDir, 1 ); // light direction
+
+// world * view * proj matrix
+D3DXMATRIX matTemp;
+D3DXMatrixTranspose(&matTemp,&(m_matWorld * m_matView * m_matProj));
+m_pd3dDevice->SetVertexShaderConstant(8, &matTemp, 4);
+
+// world matrix
+D3DXMatrixTranspose(&matTemp,&m_matWorld);
+m_pd3dDevice->SetVertexShaderConstant(0, &matTemp, 4); This example uses a directional light, that is moveable with the right mouse button. The mouse movement is tracked via the WM_MOUSEMOVE in the Windows message procedure function MsgProc(). Pixel Shader Instructions Provided in all the upcoming examples is a very simple ps.1.1 pixel shader in diff.psh, that only displays the color map. Additionally a ps.1.1 pixel shader in diffDot3.psh and a ps.1.4 pixel shader in diffDot314.psh, that are specific for the respective example can be found in the accompanying example directory on the DVD: ps.1.1
+tex t0 //sample texture
+mov r0,t0
+
+ps.1.1
+tex t0 ; color map
+tex t1 ; normal map
+dp3 r1, t1_bx2, v0_bx2 ; dot(normal,light)
+mul r0,t0, r1 ; modulate against base color
+
+ps.1.4
+texld r0, t0 ; color map
+texld r1, t0 ; normal map
+dp3 r2, r1_bx2, v0_bx2 ; dot(normal, light)
+mul r0, r0, r2 Contrary to vertex shaders, the instructions in a pixel shader need a specific ordering, which is called the instruction flow. This instruction flow differs between ps.1.1 - ps.1.3 and ps.1.4. ps.1.1 - ps.1.3 allow four types of instructions, that must appear in the order shown below: version instruction: ps.1.1 constant instruction: def c0, 1.0, 1.0, 1.0, 1.0 texture address instructions: tex* arithmetic instructions: mul, mad, dp3 etc. Every pixel shader starts with the version instruction. It is used by the assembler to validate the instructions which follow. After the version instruction a constant definition could be placed with def. Such a def instruction is translated into a SetPixelShaderConstant() call, when SetPixelShader() is executed. The next group of instructions are the texture address instructions. They are used to load data into the tn registers and additionally in ps.1.1 - ps.1.3 to modify texture coordinates. Up to four texture address instructions could be used in a ps.1.1 - ps.1.3 pixel shader. The ps.1.1 pixel shader uses the tex instruction to load a color map and a normal map. Until ps.1.4, it is not possible to use tex* instructions after an arithmetic instruction. Therefore dp3 and mul must come after the tex* instructions. There could be up to eight arithmetic instructions in a ps.1.1 shader. The ps.1.4 pixel shader instruction flow is a little bit more complex: version instruction: ps.1.4 constant instruction: def c0, 1.0, 1.0, 1.0, 1.0 texture address instructions: tex* arithmetic instructions: mul, mad, dp3 etc. phase marker texture address instruction arithmetic instructions A ps.1.4 pixel shader must start with the version instruction. Then as many def instructions as needed may be placed into the pixel shader. This example doesn't use constants. There can be up to six texture addressing instructions after the constants. The diffuse reflection model shader only uses two texld instructions to load a color map and a normal map. After the tex* instructions, up to 8 arithmetic instructions can modify color, texture or vector data. This shader only uses two arithmetic instructions: dp3 and mul. So far a ps.1.4 pixel shader has the same instruction flow like a ps.1.1 - ps.1.3 pixel shader, but the phase marker allows it to double the number of texture addressing and arithmetic instructions. It divides the pixel shader in two phases: phase 1 and phase 2. That means as of ps.1.4 a second pass through the pixel shader hardware can be done. Adding the number of arithmetic and addressing instructions shown in the pixel shader instruction flow above, leads to 28 instructions. If no phase marker is specified, the default phase 2 allows up to 14 addressing and arithmetic instructions. This pixel shader doesn't need more tex* or arithmetic instructions, therefore a phase marker is not used. In this simple example, the main difference between the ps.1.1 and the ps.1.4 pixel shader is the usage of the tex instructions in ps.1.1 to load the texture data into t0 and t1 and the usage of the texld instruction in ps.1.4 to load the texture data into r0 and r1. Both instructions are able to load four components of a texture. Valid registers for tex are tn registers only, whereas texld accepts as the destination registers only rn registers and as source registers tn in both phases and rn only in the second phase. The number of the temporary destination register of texld is the number of the texture stage. The source register always holds the texture coordinates. If the source register is a texture coordinate register, the number of the tn register is the number of the texture coordinate pair. For example texld r0, t4 samples a texture from texture stage 0 with the help of the texture coordinate set 4. In this pixel shader, the texture with the color map is sampled from texture stage 0 with the texture coordinate set 0 and the texture with the normal map is sampled from texture stage 1 with the texture coordinate set 1. The dp3 instruction calculates the diffuse reflection with a dot product of the light and the normal vector on a per-pixel basis. This instruction replicates the result to all four channels. dp3 does not automatically clamp the result to [0..1]. For example the following line of code needs a _sat modifier: dp3_sat r0, t1_bx2, r0 The dot product instruction executes in the vector portion of the pixel pipeline, therefore it can be co-issued with an instruction that executes only in the alpha pipeline. dp3 r0.rgb, t0, r0 + mov r.a, t0, r0 Because of the parallel nature of these pipelines, the instructions that write color data and instructions that write only alpha data can be paired. This helps reducing the fill-rate. Co-issued instructions are considered a single entity, the result from the first instruction is not available until both instructions are finished and vice versa. Pairing happens in ps.1.1 - ps.1.3 always with the help of a pair of .rgb and .a write masks. In ps.1.4, a pairing of the .r, .g. or .b write masks together with an .a masked destination register is possible. Therefore for example dp3.r is not possible in ps.1.1 - ps.1.3. The calculation of the dp3 instruction in both pixel shaders is similar to the calculation of the diffuse reflection on a per-vertex basis in RacorX3 in part 2 of this introduction, although the values provided to dp3 for the per-pixel reflection model are generated on different ways. Per-Pixel Lighting Per-pixel lighting needs per-pixel data. High resolution information about how the normal vector is stored in a two dimensional array of three-dimensional vectors called a bump map or normal map. Each vector in such a normal map represents the direction in which the normal vector points. A normal map is typically constructed by extracting normal vectors from a height map whose contents represent the height of a flat surface at each pixel (read more in [Dietrich][Lengyel]). This is done by the following code snippet: if(FAILED(D3DXCreateTextureFromFile(m_pd3dDevice, m_cColorMap,
+                                    &m_pColorTexture)))
+  return E_FAIL;
+
+LPDIRECT3DTEXTURE8 pHeightMap = NULL;
+if(FAILED(D3DXCreateTextureFromFile(m_pd3dDevice,m_cHeightMap,&pHeightMap)))
+  return E_FAIL;
+
+D3DSURFACE_DESC desc;
+pHeightMap->GetLevelDesc(0,&desc);
+if(FAILED(D3DXCreateTexture(m_pd3dDevice, desc.Width, desc.Height, 0, 0,
+                            D3DFMT_A8R8G8B8,D3DPOOL_MANAGED, &m_pNormalMap)))
+  return E_FAIL;
+
+D3DXComputeNormalMap(m_pNormalMap,pHeightMap,NULL,0,D3DX_CHANNEL_RED,10);
+SAFE_RELEASE(pHeightMap); D3DXCreateTextureFromFile() reads in the height map file earthbump.bmp from the media directory and provides a handle to this texture. A new and empty texture is built with D3DXCreateTexture() with the same width and height as the height map. D3DXComputeNormalMap() converts the height field to a normal map and stores this map in the texture map created with D3DXCreateTexture(). The CreateFileBasedNormalMap() function of the DotProduct3 example from the DirectX 8.1 SDK shows how to convert a height map into normal map with source code. The most important function is D3DXComputeNormalMap(), which was introduced in the DirectX 8.1 SDK. It maps the (x,y,z) components of each normal to the (r,g,b) channels of the output texture. Therefore the height map is provided in the second parameter and the normal map is retrieved via the first parameter. This example doesn't use a paletized texture, so no palette has to be provided in the third parameter. The flags in the fourth entry field allow the user to mirror or invert the normal map or to store an occlusion term in its alpha channel. The last parameter is the amplitude parameter, that multiplies the height map information. This example scales the height map data by 10. With the help of D3DXComputeNormalMap() we create a map with normals on a per-pixel basis, but there is still one problem left: the normals in the normal map were defined in one space based on how the textures were applied to the geometry. This is called texture space. In contrast the light is defined in world space. The L dot N product between vectors in two different spaces will lead to unintentionally results. There are two solutions for this problem. Generate the normal maps to always be defined relative to world space or Move the light into texture space The second solution is the most common. On a very abstract level, it can be divided into two steps: A texture space coordinate system is established at each vertex The direction to light vector L is calculated at each vertex and transformed into the texture space This will be shown in the following two sections. Establish a Texture Space Coordinate System at each Vertex The texture coordinates at each vertex form a coordinate system with a U (tangent), V (binormal = u x v) and a W (normal) axis. Figure 2 - Texture Space V and U are also called tangent vectors. These three vectors form a rotation/shear matrix, that transforms or maps from world to texture space. This example uses a sphere on which the textures are mapped on. At different vertices of this sphere, these vectors will point in an entirely different direction. Therefore you have to calculate these vectors for every vertex. To retrieve the U and V vectors, the partial derivatives of U and V relative to X, Y and Z in world space are calculated (read more in [Dietrich][Lengyel]). This is done by the following piece of code in LoadXFile() function in RacorX.cpp for the whole mesh: // compute the normals
+hr = D3DXComputeNormals(pMeshSysMem,NULL);
+if(FAILED(hr))
+  return E_FAIL;
+
+// compute texture
+hr = D3DXComputeTangent(pMeshSysMem,0,pMeshSysMem2,1,
+                        D3DX_COMP_TANGENT_NONE,TRUE,NULL);
+if(FAILED(hr))
+  return E_FAIL; D3DXComputeNormals() computes normals for each vertex in a mesh. It uses in its first parameter a pointer to the mesh. The second parameter can be used to specify the three neighbors for each face in the created progressive mesh, which is not used here. D3DXComputeTangent() (new in DirectX 8.1) is used to compute the tangent U vector based on the texture coordinate gradients of the first texture coordinate set in the input mesh. HRESULT D3DXComputeTangent(
+  LPD3DXMESH InMesh,
+  DWORD TexStage,
+  LPD3DXMESH OutMesh,
+  DWORD TexStageUVec,
+  DWORD TexStageVVec,
+  DWORD Wrap,
+  DWORD* pAdjacency
+); The first parameter must be a pointer to an ID3DXMESH interface, representing the input mesh and the third parameter will return a mesh with the one or two vectors added as a texture coodinate set. The texture coordinate set is specified in the TexStageUVec and TexStageVVec parameters. The flag D3DX_COMP_TANGENT_NONE used in one of these parameters prevents the generation of a vector. TexStage chooses the texture coordinate set in the input mesh, that will be used for the calculation of the tangent vectors. Wrap wraps the vectors in the U and V direction, if this value is set to 1 like in this example. Otherwise wrapping doesn't happen. With the last parameter one can get a pointer to an array of three DWORDs per face that specify the three neighbors for each face in the created mesh. Both functions store the vectors in the mesh. Therefore the mesh will "transport" the vectors to the vertex shader via the vertex buffer as a texture coordinate set, consisting of the three vector values. The normal from D3DXComputeNormals() and the tangent from D3DXComputeTangent() form the two axis necessary to build the per-vertex texture space coordinate system to transform L. Transforming L into Texture Space After building up the U and W vectors, L is transformed into texture space in the following lines in the vertex shader: ; Input Registers
+; v0 - Position
+; v3 - Normal
+; v7 - Texture
+; v8 - Tangent
+
+...
+
+m3x3 r5, v8, c0 ; generate tangent U
+m3x3 r7, v3, c0 ; generate normal W
+
+; Cross product
+; generate binormal V
+mul r0, r5.zxyw, -r7.yzxw;
+mad r6, r5.yzxw, -r7.zxyw,-r0;
+
+;transform the light vector with U, V, W
+dp3 r8.x, r5, -c12
+dp3 r8.y, r6, -c12
+dp3 r8.z, r7, -c12
+
+// light -> oD0
+mad oD0.xyz, r8.xyz, c33, c33 ; multiply by a half to bias, then add half The tangent U produced by D3DXComputeTangent() is delivered to the vertex shader via v8 and the normal W is provided in v3. To save bandwidth, the binormal is calculated via the cross product of the tangent and the normal in the vertex shader. The transform happens with the following formula: L.x' = U dot -L L.y' = V dot -L L.z' = W dot -L At the end of this code snippet, L is clipped by the output register oD0 to the range [0..1]. That means any negative values are set to 0 and the positive values remain unchanged. To prevent the cut off of negative values from the range of [-1..1] of v8 to [0..1], the values have to be shifted into the [0..1] range. This is done by multiplying by 0.5 and adding 0.5 in the last instruction of the vertex shader. This is not necessary for texture coordinates, because they are usually in the range [0..1]. To get the values back into the [-1..1] range, the _bx2 source register modifiers subtract by 0.5 and multiplies by 2 in the pixel shader. ps.1.1
+tex t0 ; color map
+tex t1 ; normal map
+dp3 r1, t1_bx2, v0_bx2 ; dot(normal,light)
+mul r0,t0, r1 ; modulate against base color
+
+ps.1.4
+texld r0, t0 ; color map
+texld r1, t0 ; normal map
+dp3 r2, r1_bx2, v0_bx2 ; dot(normal, light)
+mul r0, r0, r2 Pixel shader instructions can be modified by an instruction modifier, a destination register modifier, a source register modifier or a selector (swizzle modifier). mov_IM dest_DM, src_SM || src_SEL The instruction modifiers (IM) _x2, _x8, _d2, _d8 and _sat multiply or divide the result or in case of the _sat modifier saturate it to [0..1]. The destination register modifiers (DM) .rgb, .a or in case of ps.1.4 additionally .r, .g and .b controls which channel in a register is updated. So they only alter the value of the channel they are applied to. The source register modifiers (SM) _bias (-0.5), 1- (invert), - (negate), _x2 (scale) and _bx2 (signed scaling) adjust the range of register data. Alternatively a selector or swizzle modifier .r, .g, .b and .a replicates a single channel of a source register to all channels (ps.1.1 - ps.1.3 only .b and .a; ps.1.4 .r, .g, .b, .a; read more in part 3 of this introduction). Both pixel shaders use the _bx2 as a source register modifier, that doesn't change the value in the source register. For example the value of v0 in the mov instruction has not changed after the execution of the following instruction. mul r1, v0_bx2 The values that are delivered to mul for the multiplication are modified by _bx2 but not the content of the registers itself. Both pixel shaders shown above produce a valid Lambertian reflection term with the dot product between L, which is now in texture space and a sample from the normal map, as shown in part 2 (read more in [Lengyel]). The last two lines of the vertex shader store the texture coordinate values of the color texture in two texture coordinate output register: mov oT0.xy, v7.xy
+mov oT1.xy, v7.xy Sending the same texture coordinates via two texture output registers is redundant, therefore using only one of the output registers would be an improvement. The first idea that came into mind is to set D3DTSS_TEXCOORDINDEX as a texture stage state to use the texture coordinates of the first texture additionally for the second texture. Unfortunately this flag is only valid for usage with the fixed-function T&L pipeline, but not for the usage with vertex shaders. With ps.1.1 there is no way to use the texture coordinates of the first texture for the second texture without sending them via oT1 to the pixel shader a second time. The texture coordinates must be send via one of the texture coordinate registers with the same number as the texture stage. In a ps.1.4 pixel shader the programmer is able to choose the texture coordinates that should be used to sample a texture in the texld instruction as shown in the ps.1.4 pixel shader: ...
+texld r1, t0 ; normal map
+... This way the remaining texture coordinate output registers in the vertex shader can be used for other data, for example vector data. Assemble Pixel Shader Similar to the examples used in the second part of this Introduction, the pixel shaders are assembled with NVASM or in case of the ps.1.4 pixel shaders with Microsoft's psa.exe, because NVASM doesn't support ps.1.4. The integration of NVASM into the Visual C/C++ IDE is done in the same way as for vertex shaders (Read more in part 2 of this introduction). Create Pixel Shader The pixel shader binary files are opened, read and the pixel shader is created by CreatePSFromCompiledFile() in InitDeviceObjects(): CreatePSFromCompiledFile (m_pd3dDevice, "shaders/diffdot3.pso",
+                          &m_dwPixShaderDot3);
+CreatePSFromCompiledFile (m_pd3dDevice, "shaders/diff.pso",
+                          &m_dwPixShader);
+CreatePSFromCompiledFile (m_pd3dDevice, "diffdot314.pso",
+                          &m_dwPixShaderDot314); The CreatePSFromCompileFile() function is located at the end of RacorX.cpp: //---------------------------------------------------------
+// Name: CreatePSFromBinFile
+// Desc: loads a binary *.pso file 
+// and creates a pixel shader
+//---------------------------------------------------------
+HRESULT CMyD3DApplication::CreatePSFromCompiledFile (IDirect3DDevice8* m_pd3dDevice,
+                                     				TCHAR* strPSPath,
+                                     				DWORD* dwPS)
+{
+  char szBuffer[128]; // debug output
+  DWORD* pdwPS; // pointer to address space of the calling process
+  HANDLE hFile, hMap; // handle file and handle mapped file
+  TCHAR tchTempVSPath[512]; // temporary file path
+  HRESULT hr; // error
+
+  if( FAILED( hr = DXUtil_FindMediaFile( tchTempVSPath, strPSPath ) ) )
+    return D3DAPPERR_MEDIANOTFOUND;
+
+  hFile = CreateFile(tchTempVSPath, GENERIC_READ,0,0,OPEN_EXISTING,
+     				FILE_ATTRIBUTE_NORMAL,0);
+
+  if(hFile != INVALID_HANDLE_VALUE)
+  {
+    if(GetFileSize(hFile,0) > 0)
+      hMap = CreateFileMapping(hFile,0,PAGE_READONLY,0,0,0);
+    else
+    {
+      CloseHandle(hFile);
+      return E_FAIL;
+    }
+  }
+  else
+    return E_FAIL;
+
+  // maps a view of a file into the address space of the calling process
+  pdwPS = (DWORD *)MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, 0);
+
+  // Create the pixel shader
+  hr = m_pd3dDevice->CreatePixelShader(pdwPS, dwPS);
+  if ( FAILED(hr) )
+  {
+    OutputDebugString( "Failed to create Pixel Shader, errors:\n" );
+    D3DXGetErrorStringA(hr,szBuffer,sizeof(szBuffer));
+    OutputDebugString( szBuffer );
+    OutputDebugString( "\n" );
+    return hr;
+  }
+
+  UnmapViewOfFile(pdwPS);
+  CloseHandle(hMap);
+  CloseHandle(hFile);
+
+  return S_OK;
+} This function is nearly identical to the CreateVSFromCompiledFile() function shown in part 2 of this introduction. Please consult the section "Create VertexShader" in the RacorX2 example section of part 2 for more information. The main difference is the usage of CreatePixelShader() instead of CreateVertexShader(). CreatePixelShader() is used to create and validate a pixel shader. It takes a pointer to the pixel shader byte-code in its first parameter and returns a handle in the second parameter. CreatePixelShader() fails on hardware that does not support ps.1.4 pixel shaders. You can track that in the debug window after pressing <F5>. Therefore the following examples indicate this with a warning message that says:"ps.1.4 Not Supported". To be able to see a ps.1.4 shader running on the Reference Rasterizer (REF) the function CreatePixelShader() has to be called once again after switching to the REF. This functionality is not supported by the examples used throughout this introduction. OutputDebugString() shows the complete error message in the output debug window of the Visual C/C++ IDE and D3DXGetErrorStringA() interprets all Direct3D and Direct3DX HRESULTS and returns an error message in szBuffer. Set Pixel Shader Depending on the choice of the user, three different pixel shaders might be set with SetPixelShader() in Render(): //diffuse lighting.
+if(m_bBump)
+{
+  m_pd3dDevice->SetTexture(0,m_pColorTexture);
+  m_pd3dDevice->SetTexture(1,m_pNormalMap);
+
+  if (m_bPixelShader)
+    m_pd3dDevice->SetPixelShader(m_dwPixShaderDot314);
+  else
+    m_pd3dDevice->SetPixelShader(m_dwPixShaderDot3);
+}
+else
+{
+  //no lighting, just base color texture
+  m_pd3dDevice->SetTexture(0,m_pColorTexture);
+  m_pd3dDevice->SetPixelShader(m_dwPixShader);
+} If diffuse lighting is switched on, the user may select with the <P> key between the ps.1.1 and ps.1.4 pixel shader, if supported by hardware. If diffuse lighting is switched off, the simple ps.1.1 pixel shader, that only uses the color texture is set. Free Pixel Shader Resources All pixel shader resources are freed in DeleteDeviceObjects(): if(m_dwPixShaderDot3)
+  m_pd3dDevice->DeletePixelShader(m_dwPixShaderDot3);
+if(m_dwPixShaderDot314)
+  m_pd3dDevice->DeletePixelShader(m_dwPixShaderDot314);
+if(m_dwPixShader)
+  m_pd3dDevice->DeletePixelShader(m_dwPixShader); Non-Shader Specific Code I used source code published by SGI as open source some years ago to emulate a virtual trackball. The file trackball.h holds an easy to use interface to the SGI code in SGITrackball.cpp. Summarize RacorX6 shows, how the pixel shader is driven by the vertex shader. All the data that is needed by the pixel shader is calculated and provided by the vertex shader. Calculating the U and W vectors, which is necessary to build up a texture space coordinate system, is done one time while the *.x file is loaded with the D3DXComputeNormals() and D3DXComputeTangent() functions. The V vector as the binormal is calculated for every vertex in the vertex shader, because that saves bandwidth. These three vectors that form a texture space coordinate system are used to transform the light vector L to texture space. L is send through the color output register oD0 to the pixel shader. The usage of a texture space coordinate system is the basis of per-pixel lighting and will be used throughout the upcoming example. RacorX7 The main improvement of RacorX7 over RacorX6 is the usage of a specular reflection model instead of the diffuse reflection model used by the previous example. Figure 3 - RacorX7 Specular Lighting RacorX7 sets the same textures and texture stage states as RacorX6. It only sets one additional constant. Define Constants (with SetPixelShaderConstant()/def) Because this example uses a specular reflection model an eye vector must be set into c24 in FrameMove() as already shown in the RacorX4 example: // eye vector
+m_pd3dDevice->SetVertexShaderConstant(24, &vEyePt, 1); This eye vector helps to build up the V vector, which describes the location of the viewer. This is shown in the next paragraph. Pixel Shader Instructions The pixel shader in this example calculates the specular reflection on the basis of a modified Blinn-Phong reflection model that was already used in RacorX4 in part 2 of this introduction. Here is the diagram that visualizes the vectors involved in the common specular reflection models: Figure 4 - Vectors for Specular Reflection A model describing a specular reflection has to be aware of at least the location of the light source L, the location of the viewer V, and the orientation of the surface normal N. Additionally a vector R that describes the direction of the reflection might be useful. The half way vector H was introduced by Jim Blinn to bypass the expensive calculation of the R vector in the original Phong formula. The original Blinn-Phong formula for the specular reflection looks like this: kspecular (N dot H)n) whereas H = (L + V)/2 The simplified formula that was used in RacorX4 and will be used here is kspecular (N dot (L + V))n) Compared to the Blinn-Phong formula the specular reflection formula used by the examples in this introduction does not divide L + V through 2. This is compensated by a higher specular power value, which leads to good visual results. Although L + V is not equivalent to H, the term Half vector is used throughout the upcoming examples. The calculation of the vector H works in a similar way as the calculation of the light vector L in the previous example in the vertex shader: vs.1.1
+...
+; position in world space
+m4x4 r2, v0, c0
+
+; get a vector toward the camera/eye
+add r2, -r2, c24
+
+; normalize eye vector
+dp3 r11.x, r2.xyz, r2.xyz
+rsq r11.xyz, r11.x
+mul r2.xyz, r2.xyz, r11.xyz
+
+add r2.xyz, r2.xyz, -c12 ; get half angle
+
+; normalize half angle vector
+dp3 r11.x, r2.xyz, r2.xyz
+rsq r11.xyz, r11.x
+mul r2.xyz, r2.xyz, r11.xyz
+
+; transform the half angle vector into texture space
+dp3 r8.x,r3,r2
+dp3 r8.y,r4,r2
+dp3 r8.z,r5,r2
+
+; half vector -> oD1
+mad oD1.xyz, r8.xyz, c33, c33 ; multiply by a half to bias, then add half The first three code blocks caculate V. The next two code blocks generate the half vector H. H is transformed into texture space with the three dp3 instructions like the light vector in the previous example and it is stored biased in oD1 in the same way as the light vector was transfered in the previous example. Like in the previous example, this pixel shader is driven by the vertex shader: ps.1.1
+tex t0 ; color map
+tex t1 ; normal map
+dp3 r0,t1_bx2,v1_bx2; ; dot(normal,half)
+
+mul r1,r0,r0; ; raise it to 32nd power
+mul r0,r1,r1;
+mul r1,r0,r0;
+mul r0,r1,r1;
+
+; assemble final color
+mul r0,t0,r0
+
+ps.1.4
+texld r0, t0 ; color map
+texld r1, t1 ; normal map
+dp3 r2, r1_bx2, v1_bx2 ; dot(normal, half)
+
+mul r3,r2,r2 ; raise it to 32nd power
+mul r2,r3,r3
+mul r3,r2,r2
+mul r2,r3,r3
+
+mul r0, r0, r2 The pixel shader gets H via v1 and N, as in the previous example, via a normal map. The specular power is caculated via four mul instructions. This was done in RacorX4 in part 2 via a lit instruction in the vertex shader. Using the mul instructions to perform the specular color leads to visible banding artifacts: Figure 5 - RacorX7 Visual Artifacts These artifacts are a result of the small precision of the pixel shader registers and the precision loss of the H vector by shifting this vector from the range [-1..1] to [0..1] in the vertex shader and back in the pixel shader, which is necessary because the vertex shader output registers deliver only values in the range [0..1]. The only way to provide higher precision is delivering a texture map with the specular values encoded, which is loaded in the pixel shader. This will be shown below in RacorX8. Summarize This example showed one way to implement a specular reflection model. The weak point of this example is its low precision when it comes to the specular power values. The next example will show a way to get a higher precision specular reflection. RacorX8 The main difference between RacorX8 and RacorX7 is the usage of a Look-up table to store the specular power values for the specular reflection instead of using a few mul instructions in the pixel shader. The advantage of using a table-Look-up is, that the banding is reduced. This is due to the higher value range of the Look-up table compared to the solution with multiple mul instructions. Figure 6 - RacorX8 Specular Lighting with Specular Power from a Look-up table The drawback of using a Look-up table in the way shown in this example, is the need for an additional texture stage. Set Texture Operation Flags (with D3DTSS_* flags) RacorX8 sets in RestoreDeviceObjects() additionally the following two texture stage states for the texture map that holds the specular map: // specular map
+m_pd3dDevice->SetTextureStageState( 2, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP );
+m_pd3dDevice->SetTextureStageState( 2, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP ); With D3DTADDRESS_CLAMP flag, the texture is applied once and then the color of the edge pixel is smeared. Clamping sets all negative values to 0, whereas all positive values remain unchanged. Without the clamping a white ring around the earth would be visible. Set Texture (with SetTexture()) This example sets the specular map with the handle m_pLightMap16 in Render(): ...
+m_pd3dDevice->SetTexture(2, m_pLightMap16);
+... This look-up table is created as a texture map and filled with specular power values in the following lines: // specular light lookup table
+void LightEval(D3DXVECTOR4 *col, D3DXVECTOR2 *input,
+   			D3DXVECTOR2 *sampSize, void *pfPower)
+{
+  float fPower = (float) pow(input->y,*((float*)pfPower));
+  col->x = fPower;
+  col->y = fPower;
+  col->z = fPower;
+  col->w = 1;
+}
+...
+//
+// create light texture
+//
+if (FAILED(D3DXCreateTexture(m_pd3dDevice, 256, 256, 0, 0,
+             				D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &m_pLightMap16)))
+  return S_FALSE;
+
+FLOAT fPower = 16;
+if (FAILED(D3DXFillTexture(m_pLightMap16, LightEval, &fPower)))
+  return S_FALSE; D3DXFillTexture() (new in DirectX 8.1) uses the user-provided function LightEval() in its second parameter to fill each texel of each mip level of the Look-up table texture that is returned in the first parameter. HRESULT D3DXFillTexture(
+  LPDIRECT3DTEXTURE8 pTexture,
+  LPD3DXFILL2D pFunction,
+  LPVOID pData
+); This function is useful to build all kind of procedural textures, that might be used in the pixel shader as a Look-up table. The startup time of your app should be shorter by building the procedural texture with this function once and save it with D3DXSaveTextureToFile("function.dds", D3DXIFF_DDS, m_pNormalMap, 0); LightEval() which is provide in pFunction has to follow the following declaration VOID (*LPD3DXFILL2D)(
+  D3DXVECTOR4* pOut,
+  D3DXVECTOR2* pTexCoord,
+  D3DXVECTOR2* pTexelSize,
+  LPVOID pData
+); The first parameter returns the result in a pointer to a vector. The second parameter gets a vector containing the coordinates of the texel currently being processed. In our case this is a pointer to a 2D vector named input. The third parameter is unused in LightEval() and might be useful to provide the texel size. The fourth parameter is a pointer to user data. LightEval() gets here a pointer to the pfPower variable. This value is transfered via the third parameter of the D3DXFillTexture() function. This example sets the same constants as the previous example, so we can proceed further with the pixel shader source. Pixel Shader Instructions The vertex shader that drives the pixel shader differs from the vertex shader in the previous examples only in the last four lines: ; oT0 coordinates for normal map
+; oT1 half angle
+; oT2 half angle
+; oT3 coordinates for color map
+mov oT0.xy, v7.xy
+mov oT1.xyz, r8
+mov oT2.xyz, r8
+mov oT3.xy, v7.xy The texture coordinates for the normal map and the color map are stored in oT0 and oT3. The half angle vector is stored as a texture coordinate in oT1 and oT2. This example uses a 3x2 table of exponents, stored in the specular map in t2. The two pixel shaders TableSpec.psh and TableSpecps14.psh calculate the u and v position and sample a texel from the specular map. After the color texture is sampled, the color value and the value from the specular map is modulated: ps.1.1
+; t0 holds normal map
+; (t1) holds row #1 of the 3x2 matrix
+; (t2) holds row #2 of the 3x2 matrix
+; t2 holds the Look-up table
+; t3 holds color map
+tex t0 ; sample normal
+texm3x2pad t1, t0_bx2 ; calculates u from first row
+texm3x2tex t2, t0_bx2 ; calculates v from second row
+; samples texel with u,v
+tex t3 ; sample base color
+mul r0,t2,t3 ; blend terms
+
+; specular power from a Look-up table
+ps.1.4
+; r0 holds normal map
+; t1 holds half vector
+; r2 holds the lookup table
+; r3 holds color map
+texld r0, t0
+texcrd r1.rgb, t1
+dp3 r1.rg, r1, r0_bx2 ; calculates u
+phase
+texld r3, t0
+texld r2, r1 ; samples texel with u,v
+mul r0, r2, r3 In the ps.1.1 pixel shader, texm3x2pad performs a three component dot product between the texture coordinate set corresponding to the destination register number and the data of the source register and stores the result in the destination register. The texm3x2tex instruction calculates the second row of a 3x2 matrix by performing a three component dot product between the texture coordinate set corresponding to the destination register number and the data of the source register. texcrd in the ps.1.4 shader copies the texture coordinate set corresponding to the source register into the destination register as color data. It clamps the texture coordinates in the destination register with a range of [-MaxTextureRepeat, MaxTextureRepeat] (RADEON 8500: 2048) to the range of the source register [-8, 8] (MaxPixelShaderValue). This clamp might behave differently on different hardware. To be safe, provide data in the range of [-8, 8]. Values from the output registers of the vertex shader are clamped to [0..1], that means the negative values are set to 0, while the positive values remain unchanged. To bypass the problem of clamping, the data can be loaded in a texture into the pixel shader directly. In a ps.1.1 - ps.1.3 pixel shader, the rn, tn and cn registers can handle a range of [-1..1]. The color registers can only handle a range of [0..1]. To load data in the range [-1..1] via a texture in ps.1.1 - ps.1.3, the tex tn instruction can be used. In ps.1.4 the rn registers can handle a range of [-8..8] and the tn registers can handle, in case of the RADEON 8500, a range of [-2048..2048]. So data from a texture in the range of [-8..8] can be loaded via texcrd rn, tn, via texld rn, tn or texld rn, rn (only phase 2) in a ps.1.4 pixel shader. A .rgb or .rg modifier should be provided to the destination register of texcrd, because the fourth channel of the destination register is unset/undefined in all cases. The arithmetic instruction dp3 performs a three component dot product between the two source registers. Its result is stored in r and g of r1. Both shaders perform a dependant read. A dependant read is a read from a texture map using a texture coordinate which was calculated earlier in the pixel shader. The texm3x2pad/texm3x2tex instruction pair calculate the texture coordinate, that is used to sample a texel by the texm3x2tex instruction later. In the ps.1.4 shader, the second texld instruction uses the texture coordinate that was calculated earlier with the dp3 instruction. It is interesting to note, that the first texld instruction after the phase marker uses the same texture coordinate pair as the normal map. This re-usage of texture coordinates is only possible in ps.1.4. It is also important to note, that using the texm3x2pad/texm3x2tex pair to load a value from a specular map is inefficient, because both instructions calculate the same value and get the same half vector via two texture coordinate registers. Using only the texm3x2tex instruction is not possible, because this instruction can only be used together with a texm3x2pad instruction. A more elegant solution comparable to the ps.1.4 shader is possible by using the texdp3tex instruction together with a 1D specular map, but this instruction needs ps.1.2 or ps.1.3 capable hardware. You can not change the order of the t0 - t3 registers in a ps.1.1 - ps.1.3 pixel shader. These registers must be arranged in this pixel shader version in increasing numerical order. For example setting the color map in texture stage 1 in the above ps.1.1 shader won't work. In ps.1.4 it is not necessary to order the r0 - r5 or t0 and t1 registers in any way. Summarize This example improved the specular power precision by using a specular power look-up table. The drawback of this technique is the usage of an additional texture, which may be overcome by using the alpha channel of the normal map. RacorX9 RacorX9 combines a diffuse reflection model with the specular reflection model. It is based on RacorX6, RacorX7 and a further improved ps.1.4 shader, which gets the specular value from the alpha value of the normal map. Figure 7 - RacorX9 Diffuse & Specular Lighting The main point about this example is, that it handles both reflection models with the help of only two textures. So there is some room left to use additional textures for other tasks or for more per-pixel lights (See [Gosselin] for a ps.1.4 shader with three lights with falloff). This example uses two different vertex shaders. One for the ps.1.1 and one for the ps.1.4 pixel shader. The vertex shader that feeds the ps.1.1 pixel shader named SpecDot3Pix.vsh stores the half vector in oD1 and the light vector in oD0. The two texture coordinates are stored in oT0 and oT1. ; half vector -> oD1 ps.1.1
+mad oD1.xyz, r8, c33, c33 ; multiply by a half to bias, then add half
+
+...
+; light -> oD0
+mad oD0.xyz, r8.xyz, c33, c33 ; multiply a half to bias, then add half
+
+mov oT0.xy, v7.xy
+mov oT1.xy, v7.xy The only difference compared to the vertex shader used in RacorX7 is the storage of an additional light vector in oD0. The light vector is necessary to calculate the diffuse reflection in the pixel shader in the same way as shown in RacorX6: ps.1.1
+tex t0 ; color map
+tex t1 ; normal map
+dp3 r0,t1_bx2,v1_bx2 ; dot(normal,half)
+
+mul r1,r0,r0; ; raise it to 32nd power
+mul r0,r1,r1;
+mul r1,r0,r0;
+mul r0,r1,r1;
+
+dp3 r1, t1_bx2, v0_bx2 ; dot(normal,light)
+mad r0, t0, r1, r0 Highten the specular power value with four mul instructions in the pixel shader is a very efficient method. The drawback of visible banding effects is reduced by combining the specular reflection model with a diffuse reflection model. The light vector in the dp3 instruction is used in the same way as in RacorX7. Compared to the vertex shader above the second vertex shader named SpecDot314.psh stores the half vector in oT2 and oT3 instead of oD1 and the texture coordinates, which are used later in the pixel shader for both textures, in oT0: ; half vector -> oT2/oT3 ps.1.4
+mad oT2.xyz, r8, c33, c33 ; multiply by a half to bias, then add half
+mad oT3.xyz, r8, c33, c33 ; multiply by a half to bias, then add half
+...
+; light -> oD0
+mad oD0.xyz, r8.xyz, c33, c33 ; multiply a half to bias, then add half
+
+mov oT0.xy, v7.xy
+--------
+; specular power from a lookup table
+ps.1.4
+; r1 holds normal map
+; t0 holds texture coordinates for normal and color map
+; t2 holds half angle vector
+; r0 holds color map
+texld r1, t0
+texcrd r4.rgb, t2
+
+dp3 r4.rg, r4_bx2, r1_bx2 ; (N dot H)
+mov r2, r1 ; save normal map data to r2
+phase
+texld r0, t0
+texld r1, r4 ; samples specular value from normal map with u,v
+dp3 r3, r2_bx2, v0_bx2 ; dot(normal,light)
+mad r0, r0, r3, r1.a The real new thing in this pixel shader is the storage of the specular power value in the alpha value of the normal map. This Look-up table is accessed like the Look-up table in RacorX8. Therefore the normal map is sampled a second time in phase 2. If this pixel shader would try to use the v0 color register, the two dp3 instructions would have to be moved in phase 2, but then the necessary dependant texture read done in the second texld instruction in phase 2 would not be possible. Therefore the ps.1.4 shader wouldn't work with the half vector in v0 at all. The look-up table is built up with the following piece of code: //specular light Look-up table
+void LightEval(D3DXVECTOR4 *col,D3DXVECTOR2 *input,
+   			D3DXVECTOR2 *sampSize,void *pfPower)
+{
+  float fPower = (float) pow(input->y,*((float*)pfPower));
+  col->x = fPower;
+  col->y = fPower;
+  col->z = fPower;
+  col->w = input->x;
+}
+
+...
+
+//
+// create light texture
+//
+if (FAILED(D3DXCreateTexture(m_pd3dDevice, desc.Width, desc.Height, 0, 0,
+             				D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &m_pLightMap16)))
+  return S_FALSE;
+
+FLOAT fPower = 16;
+if (FAILED(D3DXFillTexture(m_pLightMap16,LightEval,&fPower)))
+  return S_FALSE;
+
+// copy specular power from m_pLightMap16 into the alpha
+// channel of the normal map
+D3DLOCKED_RECT d3dlr;
+m_pNormalMap->LockRect( 0, &d3dlr, 0, 0 );
+        BYTE* pDst = (BYTE*)d3dlr.pBits;
+
+D3DLOCKED_RECT d3dlr2;
+m_pLightMap16->LockRect( 0, &d3dlr2, 0, 0 );
+BYTE* pDst2 = (BYTE*)d3dlr2.pBits;
+
+for( DWORD y = 0; y < desc.Height; y++ )
+{
+  BYTE* pPixel = pDst;
+  BYTE* pPixel2 = pDst2;
+
+  for( DWORD x = 0; x < desc.Width; x++ )
+  {
+    *pPixel++;
+    *pPixel++;
+    *pPixel++;
+    *pPixel++ = *pPixel2++;
+    *pPixel2++;
+    *pPixel2++;
+    *pPixel2++;
+  }
+  pDst += d3dlr.Pitch;
+  pDst2 += d3dlr2.Pitch;
+}m_pNormalMap->UnlockRect(0); m_pLightMap16->UnlockRect(0); SAFE_RELEASE(m_pLightMap16); A specular map in m_pLightMap16 is created as already shown in RacorX8 with the help of the LightEval() function. The values of this map are stored in the alpha values of the normal map after retrieving a pointer to the memory of both maps. The specular map is then released. This way the ps.1.4 pixel shader only uses two texture stages, but there is a weak point in this example. The ps.1.4 pixel shader is slow compared to the ps.1.1 pixel shader. The higher precision of the specular value has its price. Using the normal map with 2048x1024 pixels for storage of the specular power slows down the graphics card. Using a smaller normal map speeds up the framerate substantially, but on the other side reduces then precision of the normals. Using specular power in an additional texture would eat up one texture stage. Using an equivalent to the ps.1.1 shader, which is shown in the following lines, won't allow us to use more than one or two lights: ps.1.4
+texld r0, t0 ; color map
+texld r1, t1 ; normal map
+dp3 r2, r1_bx2, v1_bx2 ; dot(normal, half)
+
+mul r3,r2,r2 ; raise it to 32nd power
+mul r2,r3,r3
+mul r3,r2,r2
+mul r2,r3,r3
+
+dp3 r1, r1_bx2, v0_bx2 ; dot(normal,light)
+mad r0, r0, r1, r2 The best way to improve the ps.1.1 and ps.1.4 pixel shaders in this example is to store the specular power value in the alpha value of an additional smaller texture, which might add new functionality to this example. This is shown by Kenneth L. Hurley [Hurley] for a ps.1.1 shader and by Steffen Bendel [Bendel] and other ShaderX authors for a ps.1.4 pixel shader. Summarize This example has shown the usage of a combined diffuse and specular reflection model, while using only two texture stages. It also demonstrates the trade-off which has to be made by using the specular power in the alpha value of a texture, but also its advantage: there are more instruction slots left for using more than one per-pixel light. A rule of thumb might be using up to three per-pixel lights in a scene to highlight the main objects and the rest of the scene should be lit with the help of per-vertex lights. These examples might be improved by adding an attenuation factor calculated on a per-vertex basis like in RacorX5 or by adding an attenuation map in one of the texture stages [Dietrich00][Hart]. Further Reading I recommend the article by Philippe Beaudoin and Juan Guardado [Beaudoin] to see a power function in a pixel shader that calculates a high-precision specular power value. David Gosselin implements three lights with a light falloff at the end of his article [Gosselin]. Kenneth Hurly [Hurley] describes how to produce diffuse and specular maps in an elegant way with Paint Shop Pro. Additionally he describes a ps.1.1 pixel shader that uses a diffuse and a specular texture map to produce better looking diffuse and specular reflections. This pixel shader is an evolutionary step forward compared to the ps.1.1 shaders shown here. Steffen Bendel [Bendel] describes a way to produce a combined diffuse and specular reflection model in a ps.1.4 pixel shader, that uses a much higher precision and leads to a better visual experience. That's the reason why he called it smooth lighting. References [Beaudoin] Philippe Beaudoin, Juan Guardado, "A Non-Integer Power Function on the Pixel Shader", ShaderX, Wordware Inc., pp ?? - ??, 2002, ISBN 1-55622-041-3 [Bendel] Steffen Bendel, "Smooth Lighting with ps.1.4", ShaderX, Wordware Inc., pp ?? - ??, 2002, ISBN 1-55622-041-3 [Dietrich] Sim Dietrich, "Per-Pixel Lighting", NVIDIA developer web-site. [Dietrich00] Sim Dietrich, "Attenuation Maps", Game Programming Gems, Charles River Media, pp 543 - 548, ISBN 1-58450-049-2 [Gosselin] David Gosselin, "Character Animation with Direct3D Vertex Shaders", ShaderX, Wordware Inc., pp ?? - ??, 2002, ISBN 1-55622-041-3 [Hurley] Kenneth L. Hurley, "Photo Realistic faces with Vertex and Pixel Shaders", ShaderX, Wordware Inc., pp ?? - ??, 2002, ISBN 1-55622-041-3 [Lengyel] Eric Lengyel, Mathematics for 3D Game Programming & Computer Graphics, Charles River Media Inc., 2002, pp 150 - 157, ISBN 1-58450-037-9 [Taylor] Philip Taylor, "Per-Pixel Lighting", http://msdn.microsoft.com/directx Acknowledgment I would like to thank Philip Taylor for permission to use the earth textures from the Shader Workshop held at Meltdown 2001. Additionally I would like to thank Jeffrey Kiel from NVIDIA for proofreading this paper. Epilogue Improving this introduction is a constant effort. Therefore I appreciate any comments and suggestions. Improved versions of this text will be published on http://www.direct3d.net/ and http://www.gamedev.net. Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Graphics Programming and Theory » Article: Introduction to Shader Programming Part IV: Programming Pixel Shaders English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

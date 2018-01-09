@@ -1,0 +1,377 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Graphics Programming and Theory » Article: Radiosity Methods Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This SDL & Fonts Neural Netware 3D Vectors Insertion Sort SuperQuadric Ellipsoids and Toroids, OpenGL Lighting, and Timing Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Radiosity Methods By Hin Jang | Published Dec 02 1999 03:09 AM in Graphics Programming and Theory radiosity surface computer patch equation graphics basis Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource <%Topic="Radiosity Methods"%> Radiosity Methods by Hin Jang Radiosity is the rate at which energy leaves a surface. A Lambertian surface is one that reflects an amount of light from a unit differential area dA proportional to the cosine of the angle between the surface normal N and the direction of the light source2. For an environment consisting of such surfaces, the radiosity equation is <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                      |\
+
+                      |
+
+B(x)  =  B<SUP>e</SUP>(x) + p(x) |  G(x, x')B(x') dx'
+
+                      |
+
+                     \|
+
+
+
+
+
+      =  B<SUP>e</SUP>(x) + p(x)E(x)
+
+
+
+      =  B<SUP>e</SUP>(x) + B<SUP>r</SUP>(x)
+
+
+
+</FONT> where B(x), the radiosity at point x measured in energy per unit time per unit area, is the sum of emitted radiosity B e (x) and the reflected radiosity B r (x). Reflectivity, a function of wavelength, is denoted p(x). The integral is taken over the hemisphere about x. G(x, x') accounts for the relative orientation, distance and visibility of the surfaces. <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                cos(t<SUB>x</SUB>) cos(t<SUB>x'</SUB>)
+
+G(x, x')  =   --------------------  V(x, x')
+
+                 pi |x - x'|<SUP>2</SUP>
+
+
+
+</FONT> V(x, x') is equal to one if point x' is visible from point x, zero otherwise. E(x) is irradiance, the amount of energy per unit area received from other surfaces. Solving the radiosity equation involves projecting the emittance and reflectance functions onto a set of basis functions. For radiosity B(x), its approximation is B^(x), a linear combination of n basis functions {Ni}i = 1, ..., n. The approximation for reflectivity p(x) is similarly defined. <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                     n 
+
+                    ----
+
+B(x)  ~=  B^(x)  =  \      B<SUB>i</SUB>N<SUB>i</SUB>(x)
+
+                    /
+
+                    ----
+
+                    i=1
+
+
+
+
+
+                     n
+
+                    ----
+
+p(x)  ~=  p^(x)  =  \      p<SUB><I>l</I></SUB>N<SUB><I>l</I></SUB>(x)
+
+                    /
+
+                    ----
+
+                    <I>l</I>=1
+
+
+
+</FONT> where B i and p l are the coefficients of the chosen orthonormal bases. The coefficients B i are the inner product i> 6. As such, the approximation of B(x) can be written as <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                     n 
+
+                    ----
+
+B(x)  ~=  B^(x)  =  \      <B, N<SUB>i</SUB>> N<SUB>i</SUB>(x)
+
+                    /
+
+                    ----
+
+                    i=1
+
+
+
+</FONT> The solution to the original radiosity equation for receiving surface i is approximated by the following linear system <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                          n
+
+                         ----
+
+B(x)  =  B<SUB>i</SUB>  =  B<SUP>e</SUP><SUB>i</SUB>   +   \      K<SUB>ij</SUB>B<SUB>j</SUB>
+
+                         /
+
+                         ----
+
+                         j=1
+
+
+
+</FONT> where <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+        |\            |\
+
+        |             |
+
+K<SUB>ij</SUB>  =  |    p^(x) dx  |    G(x, x')N<SUB>j</SUB>(x')N<SUB>i</SUB>(x) dx'
+
+        |             |
+
+       \|            \|
+
+
+
+</FONT> The reflected radiosity B r (x) is <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                         n               n
+
+                        ----            ----
+
+B<SUP>r</SUP>(x)  =  p^(x)E(x)  =  \     p<SUB><I>l</I></SUB>N<SUB><I>l</I></SUB>(x)   \      E<SUB>i</SUB>N<SUB>i</SUB>(x)
+
+                        /               /
+
+                        ----            ----
+
+                        <I>l</I>=1             i=1
+
+
+
+</FONT> If the radiosity equation is decomposed as follows irradiance from scene radiosities The operator G for a general function f is <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">|\|<I>G</I>(f)(x)  =  |  G(x, x')f(x') dx'|\|</FONT> so that <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">E(x)  = <I>G</I>(B)(x)</FONT> radiosities from irradiances and reflectivities The operator S is <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088"><I>S</I>(f)(x)  =  p(x)f(x)</FONT> so that <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">B<SUP>r</SUP>(x)  =  <I>S</I>(E)(x)</FONT> the radiosity equation becomes <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+B(x)  =  B<SUP>e</SUP>(x) + <I>K</I>(B)(x)
+
+
+
+      =  B<SUP>e</SUP>(x) + <I>S</I> o <I>G</I>(B)(x)
+
+
+
+</FONT> and the linear system can be written as <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                n
+
+               ----
+
+B<SUB>i</SUB>  =  B<SUP>e</SUP><SUB>i</SUB>  +   \      K<SUB>ij</SUB>B<SUB>j</SUB>
+
+               /
+
+               ----
+
+               j=1
+
+
+
+
+
+                n            n
+
+               ----         ----
+
+    =  B<SUP>e</SUP><SUB>i</SUB>  +   \      S<SUB>ik</SUB>   \      G<SUB>kj</SUB>B<SUB>j</SUB>
+
+               /            /
+
+               ----         ----
+
+               k=1          j=1
+
+
+
+</FONT> where <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+K<SUB>ij</SUB>  =  <<I>S</I> o <I>G</I>(N<SUB>j</SUB>), N<SUB>i</SUB>>
+
+
+
+G<SUB>kj</SUB>  =  <<I>G</I>(N<SUB>j</SUB>), N<SUB>k</SUB>>
+
+
+
+S<SUB>ik</SUB>  =  <<I>S</I>(N<SUB>k</SUB>), N<SUB>i</SUB>>
+
+
+
+          n
+
+         ----
+
+      =  \      p<SUB>l</SUB><N<SUB><I>l</I></SUB> N<SUB>k</SUB> N<SUB>i</SUB>>
+
+         /
+
+         ----
+
+         <I>l</I>=1
+
+
+
+</FONT> The decomposition into operators G and S allows for efficient representation of each operator individually 3. Hierarchical Radiosity For n elements in an environment, a linear system of n equations must be solved to yield the radiosity solution. This requires an algorithm to compute n * n coefficients representing the interaction of light energy between each pair of elements. To avoid the enormous computational complexity, the operations can be decomposed into n blocks for a given accuracy 9. In each block, the magnitude of interaction is about the same. The approach of hierarchical radiosity subdivides, recursively, each input surface into a set of subpatches until the measure of interaction is constant across a given subpatch 7. Each node in the hierarchy represents an area of the original surface. Two nodes are linked if the interaction between them can be computed to within some predefined accuracy. The following code fragment establishes all linkages between initial patches p and q. FormFactor( ) computes the percentage of light interaction as the integral of G(x, x'), defined eariler, with respect to the area of the receiver patch, taking into account, also, the degree of occlusion. If either form factor is larger than the estimate Fe, the patch is subdivided into four new quadrilaterials. The subdivision is stored in quadtree data structure. Subdivide( ) returns false if the patch cannot be subdivided further, in that its area is less than Ae. <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+void Refine(Patch *p, Patch *q, double Fe, double Ae)
+
+{
+
+   double   Fpq, Fqp;
+
+
+
+   Fpq = FormFactor(p, q);
+
+   Fqp = FormFactor(q, p);
+
+
+
+   if (Fpq < Fe && Fqp < Fe)
+
+      Link(p, q);
+
+   else {
+
+      if (Fpq > Fqp) {
+
+         if (Subdivide(q, Ae)) {
+
+            Refine(p, q->ne, Fe, Ae);
+
+            Refine(p, q->nw, Fe, Ae);
+
+            Refine(p, q->se, Fe, Ae);
+
+            Refine(p, q->sw, Fe, Ae);
+
+         } else Link(p, q);
+
+      } else {
+
+         if (Subdivide(p, Ae)) {
+
+            Refine(q, p->ne, Fe, Ae);
+
+            Refine(q, p->ne, Fe, Ae);
+
+            Refine(q, p->ne, Fe, Ae);
+
+            Refine(q, p->ne, Fe, Ae);
+
+         } else Link(p, q);
+
+      }
+
+   }
+
+}
+
+           
+
+</FONT> Once all form factors have been determined, the radiosity for each patch is calculated. Gather( ) accumlates the total amount of energy received by a patch directly and from its parent subpatches. The average brightness of each patch is stored in B and its diffuse colour in is stored in Cd. The brightness, gathered from the list of all interactions in q, is stored in Bg. <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+void Gather(Patch *p)
+
+{
+
+   Patch    *q;
+
+   double   Fpq;
+
+
+
+   if (p != NULL) {
+
+      p->Bg = 0.0;
+
+      for (q = p->interactions; q != NULL; q = q->next) {
+
+         Fpq = FormFactor(p, q)
+
+         p->Bg += Fpq * p->Cd * q->B;
+
+      }
+
+      Gather(p->sw);
+
+      Gather(p->se);
+
+      Gather(p->nw);
+
+      Gather(p->ne);
+
+   }
+
+}
+
+
+
+</FONT> The disadvantage of hierarchical radiosity is that shadow boundaries tend to be jagged because subdivision occurs regularly and, therefore, does not follow the contour of the shadow. One way to remove the discontinuities is to mesh the environment along the curve. This method of discontinuity meshing, however, increases the number of surfaces in a scene, magnifying the computational complexity. Galerkin Radiosity The accuracy to which radiosity is computed in the previous method is dependent on surface geometry. Complex interactions among non-planar surfaces require finer subdivision, at the cost of greater computation, since the bases are assumed to be piecewise constant across the subpatches. One way to avoid the limiting feature of hierarchical radiosity is to project the functions onto a higher order basis. Galerkin radiosity is a means by which the integral equation for radiosity can be solved in terms of a basis set of non-constant functions across a surface 12. The basis set is {Tk(s, t) | k = 0, 1 ... n}, where s and t are the parametric variables of the surface and k denotes a particular function of the set. {Tk(s, t)} is an orthonormal set of basis functions where the coefficients for a given radiosity function over surface i is <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+
+
+B<SUP>k</SUP><SUB>i</SUB>  =  <B<SUB>i</SUB>, T<SUB>k</SUB>>
+
+
+
+</FONT> so that the original function can be approximated with <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+               n
+
+              ----
+
+B<SUB>i</SUB>(s, t)  ~=  \     B<SUP>k</SUP><SUB>i</SUB> T<SUB>k</SUB>(s, t)
+
+              /
+
+              ----
+
+              k=1
+
+
+
+</FONT> Applying the Galerkin method for radiosity begins with the radiosity equation of two variables <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                               |\  |\
+
+                               |   |
+
+B(s, t)  =  B<SUP>e</SUP>(s, t) + p(s, t) |   |  G(s, t, u, v)B(u, v) dudv
+
+                               |   |
+
+                              \|  \|
+
+
+
+</FONT> Expanding B(u, v) in terms of the basis set {Tl(u, v)} gives <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                                 |\  |\
+
+                                 |   |
+
+B(s, t)  =  B<SUP>e</SUP>(s, t) + p(s, t)B<SUP>l</SUP> |   |  G(s, t, u, v)T<SUB>l</SUB>(u, v) dudv
+
+                                 |   |
+
+                                \|  \|
+
+
+
+</FONT> By taking the inner product of both sides with the kth basis set function Tk(s, t), the radiosity equation can be written as a matrix equation <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+                ----
+
+B<SUP>k</SUP><SUB>i</SUB>  -  E<SUP>k</SUP><SUB>i</SUB>  =   \     B<SUP>l</SUP><SUB>j</SUB> K<SUP>kl</SUP><SUB>ij</SUB>
+
+                /
+
+                ----
+
+                j, l
+
+
+
+</FONT> where Kklij, Bki, and Eki are the form factors, patch radiosities, and emittances, respectively. The radiosity solution computed by this method is a list of basis set expansion coefficients Bki for each surface i and basis function k 12. The radiance at a point (s, t) on surface i is recovered from these coefficients using <FONT FACE="Courier New, fixedsys" SIZE="2" COLOR="#000088">
+
+               n
+
+              ----
+
+B<SUB>i</SUB>(s, t)  ~=  \     B<SUP>k</SUP><SUB>i</SUB> T<SUB>k</SUB>(s, t)
+
+              /
+
+              ----
+
+              k=1
+
+
+
+</FONT> Galerkin radiosity allows direct evaluation of the radiosity equation without the need to tesselate a curved surface. Meshing is only required when two surfaces are extremely close to each other and is not needed to model variations in intensity across a surface 12. [1] Bastos, R., M. Goslin, and H. Zhang, Efficient Rendering of Radiosity Using Textures and Bicubic Reconstruction, TR-96-025, Department of Computer Science, University of North Carolina, Chapel Hill, 1996 [2] Foley, J.D., A. van Dam, S.K. Feiner, and J.F. Hughes, Computer Graphics Principles and Practice, Second Edition, Addison-Wesley, Reading, 723-724, 1990 [3] Gershbein, R., P. Schroder, and P. Hanrahan, Textures and Radiosity: Controlling Emission and Reflection with Texture Maps, Research Report CS-TR-449-94, Department of Computer Science, Princeton University, 1993 [4] Gershbein, R., An Adaptive Gauss Method For Computing Irradiance Coefficients of Galerkin Radiosity Systems, TR-485-95, Department of Computer Science, Princeton University, 1995 [5] Goral C.M., K.E. Torrance, D.P. Greenberg, and B. Battaile, "Modeling the Interaction of Light Between Diffuse Surfaces," Computer Graphics, 18(3):213-222, July 1984 [6] Gortler, S.J., P. Schr÷der, M.F. Cohen, and P. Hanrahan, "Wavelet Radiosity," Computer Graphics, SIGGRAPH 1993 Proceedings, 27(4):221-230 [7] Hanrahan, P., D. Salzman, and L. Aupperle, "A Rapid Hierarchical Radiosity Algorithm," Computer Graphics, SIGGRAPH 1991 Proceedings, 25(4):197-206 [8] Kajiya, J.T., "The Rendering Equation," Computer Graphics, SIGGRAPH 1986 Proceedings, 20(4):143-149 [9] Lischinski, D., F. Tampieri, and D.P. Greenberg, "Combining Hierarchical Radiosity and Discontinuity Meshing," Computer Graphics, SIGGRAPH 1993 Proceedings, 27(4):199-208 [10] Pellegrini, M., "Monte Carlo Approximation of Form Factors with Error Bounded a Priori," ACM Proceedings of the Eleventh Annual Symposium on Computational Geomerty, 287-296, 1995 [11] Smits, B., J. Arvo, and D. Greenberg, "A Clustering Algorithm for Radiosity in Complex Environments," Computer Graphics, SIGGRAPH 1994 Proceedings, 28(4):435-442 [12] Zatz, H.R., "Galerkin Radiosity: A Higher Order Solution for Global Illumination," Computer Graphics, SIGGRAPH 1993 Proceedings, 27(4):213-220 Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Graphics Programming and Theory » Article: Radiosity Methods English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

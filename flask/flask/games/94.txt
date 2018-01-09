@@ -1,0 +1,66 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » General Programming » Article: Creating a Windows NT/2000/XP Service Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Game Programming Genesis Part II : Using Resources in Win32 Programs Game Programming Genesis Part III : Tracking Your Window and Using GDI Game Programming 101 Part II Game Programming Genesis Part VI : Bitmapped Graphics in DirectDraw Game Programming Genesis Part IV : Introduction to DirectX Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 0 Like 0Likes Dislike Creating a Windows NT/2000/XP Service By Dean Harding | Published Mar 20 2003 03:44 PM in General Programming service control you' windows services able status null Hide If you find this article contains errors or problems rendering it unreadable (missing images or files, mangled code, improper text formatting, etc) please contact the editor so corrections can be made. Thank you for helping us improve this resource Download attached article resource Introduction Creating a Service under Windows NT/2000/XP isn't hard. It requires a little knowledge of how services interact with the system, but once you've got a basic framework, a service works just like any other program. The advantages a service offers over a regular program is that it will automatically start up when Windows starts up, if it crashes, you can configure Windows to automatically restart it, and you can set it to run under any account you like (for example, to restrict how a hacker can damage your system), you can also start/stop services remotely. Remember, though, that there are also a few drawbacks to services. The first is that only NT Windows'es can use services. This means you can't run your server on a Windows 98 machine for example (though why you'd want to, I don't know). Also, services usually cannot interact with the desktop. That is, except under certain circumstances, you can't use the MessageBox function, or create windows, or anything like that. I'll leave up it reader discretion as to whether a service best suits your needs, so let's just press ahead... Setting Up The first thing you need to do is create a project for your service. You can do this with any IDE you like (or you can even use make files if that's what floats your boat), but I like Visual C++. Most of the time you'll want to make a console project but a regular windows one works as well. The very first thing you need to be able to do is install and uninstall your service from the control panel's service control manager. To see the service control manager, open the Control Panel, double-click on Administrative Tools, then on Services. I like to be able to install and uninstall my services from the command-line, with syntax like the following: C:\> MyService.exe -install or: C:\> MyService.exe -uninstall The first thing you need to do when accessing the service control manager (SCM) is open a handle to it. This is done with the OpenSCManager() function, like this: SC_HANDLE handle = ::OpenSCManager( NULL, NULL, SC_MANAGER_ALL_ACCESS ); Now, to install the service, we use code like this: SC_HANDLE service = ::CreateService(
+    handle,
+    "MyService",
+    "MyService",
+    GENERIC_READ | GENERIC_EXECUTE,
+    SERVICE_WIN32_OWN_PROCESS,
+    SERVICE_AUTO_START,
+    SERVICE_ERROR_IGNORE,
+    "C:\\Path\\To\\Executable.exe",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+); This will create a service called "MyService" and point it to use the executable "C:\Path\To\Executable.exe". To uninstall the service, use code like this: // first, open a handle to the service
+SC_HANDLE service = ::OpenService( handle, "MyService", DELETE );
+if( service != NULL )
+{
+    // remove the service!
+    ::DeleteService( service );
+} First, you have to open a handle to the service. We pass DELETE as the dwDesiredAccess parameter, since we want to delete the service. If that succeeds (it may fail if, for example, the service isn't installed), then we can call DeleteService. Once you have the service installed, you'll be able to see something like this in the SCM applet: Running the Service Once the service has been installed, you'll then be able to start and stop it from the service control manager applet. To this, you've got to add quite a bit of functionality to your framework. The first thing you need to do is start the Service Control Dispatcher. This is responsible for responding to requests from the SCM about starting, stopping or pausing the service. The Service Control Dispatcher can handle requests for multiple services (for example, you can have multiple copies of your program running on the same machine, each with a different name). To facilitate this, you need to setup a Dispatch Table, which maps service names to dispatch handlers. SERVICE_TABLE_ENTRY dispatchTable[] =
+{
+    { "MyService", &ServiceDispatch },
+    { NULL, NULL }
+};
+
+if( ::StartServiceCtrlDispatcher( dispatchTable ) == 0 )
+{
+    // if this fails, it's probably because someone started us from
+    // the command line.  Print a message telling them the "usage"
+} Here, the ServiceDispatch function is what we'll write to respond to service control requests. So what happens when you click on Start from the SCM applet is that your program calls the StartServiceCtrlDispatcher() function, which will block the current thread waiting for service control messages from the SCM. When a message is received, it passes it to the ServiceDispatch function, which might look like this: SERVICE_STATUS_HANDLE hStatus;
+SERVICE_STATUS status;
+
+void WINAPI ServiceDispatch( DWORD numArgs, char **args )
+{
+    // we have to initialize the service-specific stuff
+    memset( &status, 0, sizeof(SERVICE_STATUS) );
+    status.dwServiceType = SERVICE_WIN32;
+    status.dwCurrentState = SERVICE_START_PENDING;
+    status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+
+    hStatus = ::RegisterServiceCtrlHandler( "MyService", &ServiceCtrlHandler );
+
+    // more initialization stuff here
+
+    ::SetServiceStatus( hStatus, &status );
+} Here, we call RegisterServiceCtrlHandler to set the callback for actually responding to service control messages. You should replace the comment with the rest of your initialization code. You'll want to create another thread to do the actual work of your service. When the ServiceDistpatch exits, the thread will block waiting for more service control requests. The ServiceCtrlHandler is another function that we write which actually responds to these service control requests. A basic version might look like this: void WINAPI ServiceCtrlHandler( DWORD control )
+{
+    switch( control )
+    {
+    case SERVICE_CONTROL_SHUTDOWN:
+    case SERVICE_CONTROL_STOP:
+        // do shutdown stuff here
+
+        status.dwCurrentState = SERVICE_STOPPED;
+        status.dwWin32ExitCode = 0;
+        status.dwCheckPoint = 0;
+        status.dwWaitHint = 0;
+        break;
+    case SERVICE_CONTROL_INTERROGATE:
+        // just set the current state to whatever it is...
+        break;
+    }
+
+    ::SetServiceStatus( hStatus, &status );
+} The important thing here is that when you get the SERVICE_CONTROL_SHUTDOWN or SERVICE_CONTROL_STOP control message, you should stop all your threads and shutdown the service. Also of note, if you get a SERVICE_CONTROL_SHUTDOWN message, that means that Windows is shutting down. You only get about 2 seconds to stop processing before Windows will kill your process, so you might need to do something different to make the shutdown happen faster. Debugging a Service This is where things get tricky. You cannot debug a service that is not set to interact with the desktop, also, because of the way services work, you need to be able to attach your debugger to a running service. To get over the first problem, you need to have the service run under the LocalSystem account and be able to "Interact with Desktop". To do this, right-click on your service, and go to Properties, go to the Log On tab, and check "Allow service to interact with desktop", as in the screen shot below: Next, to be able to actually debug the service, you've got to get your debugger to attach to the running process. This can be done two ways. When the service has started, you can right-click on the process name in the Task Manager and select Debug from the menu. This will start up your debugger and you can then set break-points and such to your heart's content. Another method is to insert a call to DebugBreak in you code somewhere. Then, when it get's there, it'll raise an exception and Windows will let you attach the debugger. You'll need to step out of the DebugBreak function before you'll be able to see any source code, though... End Game And that's pretty much all you need to know! The example framework that I've included add quite a bit of functionality to what I've described here. For example, you can start and stop the service from the command-line, and you can run the service and a regular windows console application. This is good because it makes debugging easier. If you have any comments or questions, don't hesitate to mail me: dean@codeka.com.   Codeka.com - Just click it. Download attached article resource Comments Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » General Programming » Article: Creating a Windows NT/2000/XP Service English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy

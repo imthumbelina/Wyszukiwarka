@@ -1,0 +1,90 @@
+Jump to content Google Sign in options Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy      Sign In    Create Account 6 Search Advanced Search section: Google This database Forums Members Help Files Developer Journals Gallery Calendar Downloads Resources Store Classifieds Tracker Links Home For Beginners Articles All Articles Post an Article Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Breaking into the Industry Production and Management Interviews Business and Law Event Coverage Forums All Forums Community Interaction GDNet Lounge Coding Horrors Article Writing GDNet Comments, Suggestions and Ideas Your Announcements Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile & Console Development Build Systems & Source Control APIs and Tools Creative Game Design Writing For Games Music and Sound Visual Arts Gallery Business Breaking into the Industry Business & Law Production & Management Community Developer Journals Screenshot Showdown GDNet+ Subscriptions Gallery Books Store Top Members Classifieds Job Offers Contractors For Hire Contract Projects Hobbyist Projects Marketplace Home » Articles » Technical » Graphics Programming and Theory » Article: HLSL: Greyscale Shader Tutorial Watched Content New Content Banner advertising on our site currently available from just $5! 1. Learn about the promo. 2. Sign up for GDNet+. 3. Set up your advert! More Like This Deferred Rendering Demystified Soft-Edged Shadows Rendering and Simulation in an Off-Road Driving Game Rendering Water as a Post-process Effect Realistic Natural Effect Rendering: Water I Categories (See All) Technical Game Programming General Programming Graphics Programming and Theory DirectX and XNA OpenGL Multiplayer and Network Programming Artificial Intelligence Math and Physics Mobile Development APIs and Tools Creative Game Design Music and Sound Visual Arts Business Event Coverage Breaking Into the Industry Business and Law Interviews Production and Management Gamedev.net Help Recent Resources Improve Player Retention Reacting to Behavior [Server Scripts] May 12 2015 04:22 PM | 6 Comments Dynamic vertex pulling with D3D11 Apr 29 2015 11:37 AM | 5 Comments Giving Away $17,000 Worth of Toto Temple Deluxe at Pax East Apr 27 2015 07:27 AM | 2 Comments Everything You Ever Wanted to Know About Authenticode Signing May 08 2015 11:06 AM | 5 Comments Shader Cross Compilation and Savvy - The Smart Shader Cross Compiler May 15 2015 09:23 AM | 0 Comments Crowdin: Localizing Without Pain Apr 15 2015 11:07 AM | 1 Comments Automated Deployment of Your Game Apr 13 2015 10:47 AM | 3 Comments Show more » | View all recent resources» 2 Like 6Likes Dislike HLSL: Greyscale Shader Tutorial By George Kristiansen | Published Aug 09 2013 01:27 PM in Graphics Programming and Theory Peer Reviewed by (jbadams, Dave Hunt) hlsl greyscale black and white shader tutorial Hide In most modern games, colour rendering is definitely the best way to portray the richness of the 3D graphics and lighting effects achievable on current hardware. However, as games such as L.A. Noire have successfully demonstrated, playing a game in old-style black and white graphics can completely transform the way in which the player percieves the same scene. This small article will show one way (of many!) to render your 3D geometry using a greyscale pallette rather than in full colour, using HLSL and DirectX. The following image shows a scene rendered in full colour: ...and this image shows the same scene, but this time rendered using the greyscale colour conversion explained in this article: Neither of these images have been converted or tweaked in an external graphics program - they are rendered purely using Direct3D. The concept If you've experimented with even basic 3D programming, you will know that a pixel typically contains four channels of information: R (red), G (green), B (blue) and A (alpha). Of course, the exact nature of the information held by each pixel on a render surface depends on the format you choose, but RGB will almost always be a part of it. You may also know that the colour value of each channel typically ranges from 0 to 255. Combinations of the numbers assigned to each colour channel will produce a mixture of the overall colour specified for each pixel. Here are some examples (given in the [R,G,B] format - we will disregard the alpha channel because it codes for transparency, not raw colour): [255,0,0] [0,200,200] [200,255,0] [100,100,100] You may notice that the last colour, [100,100,100], is a shade of grey. You may also notice that all of the colour channel values are the same, that is, each one carries a value of 100 for R, G and B. This is the key to achieving a greyscale effect - in order to avoid rendering in true colour, all of the colours must carry a similar weight, meaning that none will dominate over the others, and the result will be a shade of grey ranging from total blackness (given as [0,0,0]) to pure white (given as [255,255,255]). Achieving this effect is relatively simple, especially if you already have a shader to render in true colour. Converting from colour to greyscale It is a simple matter to create a greyscale effect given colour information for each pixel. Let's say we have calculated a colour of [0,100,200] for a given pixel, again in the [R,G,B] format, excluding alpha. To ensure that each colour channel has the same value while also choosing a greyscale shade which is representative of the brightness of the original colour, there are two steps to take, all of which can easily be achieved in a HLSL pixel shader: Take an average of the R, G and B channels for the pixel Assign a new colour to the pixel by entering this calculated average into each colour channel while preserving the original alpha value That's all there is to it! If we wanted to calculate the greyscale equivalent of our [0,100,200] pixel, we would arrive at an average of 100 (because (0 + 100 + 200) / 3 = 100), and so our final pixel colour would be [100,100,100]. Putting it into a shader Let's consider the following effect file designed to simulate diffuse and ambient lighting in black and white: 
+//Greyscale rendering shader, created by George Kristiansen
+
+////////////////////
+//Global variables//
+////////////////////
+float4x4 World;
+float4x4 WorldViewProjection;
+
+float LightPower;
+float LightAmbient;
+
+float3 LightDir;
+
+Texture xTexture;
+
+
+//////////////////
+//Sampler states//
+//////////////////
+sampler TextureSampler = sampler_state 
+{
+texture = <xTexture>;
+magfilter = LINEAR;
+minfilter = LINEAR;
+mipfilter = LINEAR;
+AddressU = Wrap; 
+AddressV = Wrap;
+};
+
+
+//////////////////
+//I/O structures//
+//////////////////
+struct PixelColourOut
+{
+    float4 Colour        : COLOR0;
+};
+
+struct SceneVertexToPixel
+{
+    float4 Position             : POSITION;
+    float2 TexCoords            : TEXCOORD0;
+    float3 Normal               : TEXCOORD1;
+    float4 Position3D           : TEXCOORD2;
+};
+
+
+///////////////////////////////////////////////////////////////////////
+//TECHNIQUE 1: Shaders for drawing an object using greyscale lighting//
+///////////////////////////////////////////////////////////////////////
+SceneVertexToPixel GreyscaleVertexShader(float4 inPos : POSITION, float2 inTexCoords : TEXCOORD0, float3 inNormal : NORMAL)
+{
+    SceneVertexToPixel Output = (SceneVertexToPixel)0;
+
+    Output.Position = mul(inPos, WorldViewProjection);
+
+    Output.Normal = normalize(mul(inNormal, (float3x3)World));
+    Output.Position3D = mul(inPos, World);
+    Output.TexCoords = inTexCoords;
+
+    return Output;
+}
+
+PixelColourOut GreyscalePixelShader(SceneVertexToPixel PSIn)
+{
+    PixelColourOut Output = (PixelColourOut)0;
+
+    float4 baseColour = tex2D(TextureSampler, PSIn.TexCoords);
+
+    float diffuseLightingFactor = saturate(dot(-normalize(LightDir), PSIn.Normal))*LightPower;
+
+    float4 trueColour = baseColour*(diffuseLightingFactor + LightAmbient);
+
+    float greyscaleAverage = (trueColour.r + trueColour.g + trueColour.b)/3.0f;
+    Output.Colour = float4(greyscaleAverage, greyscaleAverage, greyscaleAverage, trueColour.a);
+
+    return Output;
+}
+
+
+technique GreyscaleObject
+{
+    pass Pass0
+    {
+        VertexShader = compile vs_2_0 GreyscaleVertexShader();
+        PixelShader = compile ps_2_0 GreyscalePixelShader();
+    }
+}
+ As you can see, the vertex shader simply deals with transformations and matrix-based calculations. These are not dependent on whether the scene is drawn in greyscale or colour. The pixel shader comprises of lighting calculations which are present in pretty much every 'general' lighting shader. The texture applied to the object being drawn is sampled, a diffuse lighting contribution is calculated based on the normal and light direction, and the colour of the pixel (trueColour in the pixel shader) is found based on diffuse and ambient light. However, the final colour of the pixel is calculated using the averaging method desribed above to create a shade of grey where each colour channel has the same value. This ensures that any geometry drawn with the shader appears in greyscale rather than true colour. Conclusion This is one of many methods for drawing in greyscale. It is also possible to render the entire scene to a texture in colour, and present the scene after applying a similar calculation to this offscreen render target. This ensures that the entire scene is simultaneously converted to black and white post-render, rather than individual objects in realtime. There are also other formulae and calculation methods for doing the conversion, but this is possibly the simplest method, and it produces very respectable results. Top image is a raw capture from SimCity set to Film Noir graphics filter About the Author(s) I'm a physics student in the UK with an interest in programming as a hobby. License GDOL (Gamedev.net Open License) Comments smr Jul 03 2013 08:20 AM Great article!    I'm wondering if the color to grayscale conversion could be improved by calculating the luminance of each pixel instead of using a simple average. The human eye perceives red, green and blue differently, so each color component should be weighted when calculating a luminance value because each component contributed to its perceived brightness by a different amount. I think this would improve the contrast of the grayscale renderings.   A quick google search yielded the wikipedia article with the formula used by HDTVs:   Luminance = 0.2126*R + 0.7152*G + 0.0722*B   Which makes sense because blue would contribute the least to the perceived brighness of a pixel, while green would contribute the most as the human eye is best at seeing the color green. apatriarca Jul 03 2013 08:50 AM You may actually want to use general coefficients for the three channels to obtain several effect. Black and white photography have indeed always used colored filters and old black and white movies appearance also depends on the particular film base used (which has quite different optical characteristics than the human eye).   The easier way to implement this generalization is to consider a constant vector of coefficents (whose elements sum to one) and do a dot product to obtain the final luminance. In the article case this vector would be {1.0/3.0, 1.0/3.0, 1.0/3.0}, while in the HDTV case you may want to use {0.2126, 0.7152, 0.0722}. Hope this help. Ravyne Jul 03 2013 12:29 PM +1 to both SMR and Apartriarca. You want to discuss these issues in your article, just taking the mean average is an incomplete story, and indeed not what you want most of the time. You need to employ the dot product method because its more flexible than the sum+divide method, probably faster too. jpaulo Jul 03 2013 01:40 PM +1 to Ravyne and also add something like:   luminance = luminance * amplitude + offset   to mimic exposure where the default values should be amplitude = 1 and offset = 0. Note: Please offer only positive, constructive comments - we are looking to promote a positive atmosphere where collaboration is valued above all else. Home » Home » Articles » Technical » Graphics Programming and Theory » Article: HLSL: Greyscale Shader Tutorial English (USA) English (USA) English (USA) (COPY) Mark Community Read Forums Members Developer Journals Gallery Downloads Resources Store Classifieds Tracker Links Mark all as read Help PARTNERS Copyright © 1999-2015 GameDev.Net LLC GameDev.net™, the GameDev.net logo, and GDNet™ are trademarks of GameDev.net, LLC Navigation Home For Beginners Technical Creative Business Customer Service GDNet+ Subscriptions Job Advertising Terms of Service Privacy Policy Company Info About Us Advertise on Gamedev.net Contact Us Sign In   Use Google   Use Facebook   Use Twitter Need an account? Register now! Username Password I've forgotten my password Remember me This is not recommended for shared computers Sign in anonymously Don't add me to the active users list Privacy Policy
